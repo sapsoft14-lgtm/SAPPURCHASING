@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP Computers — Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============ DESIGN TOKENS ============ */
+  :root {
+    --bg: #F6F5F1;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF7;
+    --ink: #1C2B24;
+    --ink-soft: #5B6760;
+    --border: #DCD8CC;
+    --border-strong: #C7C2B2;
+    --teal: #0F6E5E;
+    --teal-soft: #E4F0EC;
+    --amber: #B9791F;
+    --amber-soft: #F6EBD8;
+    --rust: #A23B2E;
+    --rust-soft: #F5E4E1;
+    --shadow: 0 1px 2px rgba(28,43,36,0.06), 0 4px 12px rgba(28,43,36,0.05);
+    --radius: 8px;
+    --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  html[data-theme="dark"] {
+    --bg: #12141A;
+    --surface: #1B1E27;
+    --surface-2: #21242E;
+    --ink: #E8E6DE;
+    --ink-soft: #9BA3AE;
+    --border: #2A2E3A;
+    --border-strong: #383D4C;
+    --teal: #29B896;
+    --teal-soft: #16332C;
+    --amber: #E3A857;
+    --amber-soft: #362B18;
+    --rust: #E2685A;
+    --rust-soft: #3A2220;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  a, button, input, select { font-family: inherit; }
+
+  /* ============ HEADER ============ */
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.85rem 1.5rem;
+  }
+  .topbar-inner {
+    max-width: 1400px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .brand { display: flex; align-items: center; gap: 0.65rem; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 6px;
+    background: var(--teal); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 13px;
+    flex-shrink: 0;
+  }
+  .brand-text h1 { font-size: 0.95rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .brand-text span { font-size: 0.68rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .topbar-right { display: flex; align-items: center; gap: 0.6rem; }
+
+  .status-pill {
+    font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    background: var(--teal-soft); color: var(--teal);
+    border: 1px solid var(--teal); padding: 0.3rem 0.6rem; border-radius: 20px;
+  }
+
+  .theme-toggle {
+    width: 38px; height: 38px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--ink); transition: background 0.15s;
+  }
+  .theme-toggle:hover { background: var(--border); }
+  .theme-toggle svg { width: 18px; height: 18px; }
+  html[data-theme="dark"] .icon-sun { display: block; }
+  html[data-theme="dark"] .icon-moon { display: none; }
+  html[data-theme="light"] .icon-sun { display: none; }
+  html[data-theme="light"] .icon-moon { display: block; }
+
+  /* ============ ERROR BANNER ============ */
+  .error-banner {
+    background: var(--rust); color: #fff; font-size: 0.75rem; font-weight: 600;
+    padding: 0.55rem 1rem; text-align: center;
+  }
+  .hidden { display: none !important; }
+
+  /* ============ LAYOUT ============ */
+  .shell { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+
+  .stat-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.9rem 1rem; box-shadow: var(--shadow);
+    border-left: 3px solid var(--stat-color, var(--teal));
+  }
+  .stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .stat-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; margin-top: 0.2rem; color: var(--stat-color, var(--ink)); }
+
+  .main-grid {
+    display: grid; grid-template-columns: 300px 1fr 300px; gap: 1.25rem; align-items: start;
+  }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .panel-header {
+    padding: 0.8rem 1rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  }
+  .panel-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .panel-body { padding: 1rem; }
+
+  /* ============ TABS ============ */
+  .tabs { display: flex; background: var(--surface-2); border-radius: 7px; padding: 3px; gap: 2px; }
+  .tab-btn {
+    flex: 1; border: none; background: transparent; color: var(--ink-soft);
+    font-size: 0.72rem; font-weight: 600; padding: 0.4rem 0.5rem; border-radius: 5px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .tab-btn:not(.active):hover { color: var(--ink); }
+
+  .filter-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .filter-tabs .tab-btn { flex: none; padding: 0.35rem 0.7rem; }
+
+  /* ============ FORM ELEMENTS ============ */
+  .field { margin-bottom: 0.7rem; }
+  .field label {
+    display: block; font-size: 0.68rem; font-weight: 600; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.3rem;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+  .input, select.input {
+    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--border-strong);
+    border-radius: 6px; background: var(--surface); color: var(--ink);
+    font-size: 0.8rem; transition: border-color 0.15s;
+  }
+  .input:focus { outline: none; border-color: var(--teal); }
+  .input.mono-input { font-family: var(--font-mono); }
+
+  .hint { font-size: 0.68rem; color: var(--rust); font-weight: 600; margin-top: 0.3rem; }
+  .file-note { font-size: 0.65rem; color: var(--ink-soft); margin-top: 0.3rem; }
+
+  .callout {
+    background: var(--teal-soft); border: 1px solid var(--teal); border-radius: 6px;
+    padding: 0.7rem; margin-bottom: 0.7rem;
+  }
+  .callout-label {
+    font-size: 0.62rem; font-weight: 700; color: var(--teal); text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block;
+  }
+  .callout-balance { font-size: 0.75rem; color: var(--ink); }
+  .callout-balance strong { font-family: var(--font-mono); color: var(--teal); }
+
+  .amber-box {
+    background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 6px;
+    padding: 0.7rem; margin-top: 0.6rem;
+  }
+
+  /* ============ BUTTONS ============ */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    border: none; border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+    padding: 0.55rem 0.9rem; cursor: pointer; transition: filter 0.15s, opacity 0.15s;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-block { width: 100%; }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-secondary { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border-strong); }
+  .btn-danger { background: transparent; color: var(--rust); border: 1px solid var(--rust); padding: 0.3rem 0.6rem; font-size: 0.65rem; }
+  .btn-danger:hover { background: var(--rust-soft); }
+  .btn-amber { background: transparent; color: var(--amber); border: 1px solid var(--amber); padding: 0.3rem 0.6rem; font-size: 0.65rem; }
+  .btn-amber:hover { background: var(--amber-soft); }
+
+  /* ============ LEDGER ROWS ============ */
+  .search-wrap { position: relative; margin-bottom: 0.9rem; }
+  .search-wrap .input { padding-left: 2.1rem; }
+  .search-icon { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: var(--ink-soft); width: 15px; height: 15px; }
+
+  .ledger-list { display: flex; flex-direction: column; gap: 0.55rem; max-height: 640px; overflow-y: auto; padding-right: 2px; }
+  .ledger-row {
+    border: 1px solid var(--border); border-radius: 7px; padding: 0.75rem 0.85rem;
+    background: var(--surface-2); transition: border-color 0.15s;
+  }
+  .ledger-row:hover { border-color: var(--border-strong); }
+  .ledger-row-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+  .ledger-supplier { font-weight: 600; font-size: 0.82rem; }
+  .ledger-desc { font-size: 0.72rem; color: var(--ink-soft); margin-top: 0.15rem; }
+  .ledger-cheque-tag { font-family: var(--font-mono); font-size: 0.65rem; color: var(--amber); margin-top: 0.3rem; }
+
+  .ledger-figures { text-align: right; flex-shrink: 0; }
+  .ledger-figures .amt-total { font-family: var(--font-mono); font-weight: 600; font-size: 0.82rem; }
+  .ledger-figures .amt-paid { font-family: var(--font-mono); font-size: 0.68rem; color: var(--teal); }
+  .ledger-figures .amt-bal { font-family: var(--font-mono); font-size: 0.68rem; color: var(--rust); font-weight: 700; }
+
+  .ledger-meta {
+    display: flex; justify-content: space-between; margin-top: 0.55rem; padding-top: 0.5rem;
+    border-top: 1px dashed var(--border); font-size: 0.65rem; color: var(--ink-soft);
+  }
+  .ledger-meta strong { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
+  .ledger-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.55rem; }
+
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-soft); font-size: 0.78rem; font-style: italic; }
+
+  .supplier-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto; padding-right: 2px; }
+  .supplier-card {
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.7rem;
+    background: var(--surface-2);
+  }
+  .supplier-card-name { font-weight: 600; font-size: 0.8rem; }
+  .supplier-card-row {
+    font-size: 0.68rem; color: var(--ink-soft); margin-top: 0.25rem;
+    display: flex; align-items: center; gap: 0.35rem;
+  }
+  .supplier-card-row strong { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
+  .supplier-card-id { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-soft); float: right; }
+
+  /* Stamp badge — signature element */
+  .stamp {
+    display: inline-block; font-family: var(--font-mono); font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.5rem;
+    border: 1.5px solid currentColor; border-radius: 3px; transform: rotate(-2deg);
+    position: relative;
+  }
+  .stamp::after {
+    content: ''; position: absolute; inset: 2px; border: 1px solid currentColor; border-radius: 2px; opacity: 0.4;
+  }
+  .stamp-owed { color: var(--rust); }
+  .stamp-cheque { color: var(--amber); }
+  .stamp-cleared { color: var(--teal); }
+
+  /* ============ SIDEBAR (dark panel keeps identity in both modes) ============ */
+  .intel-panel { background: #12141A; color: #E8E6DE; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  html[data-theme="dark"] .intel-panel { background: #0C0E13; border: 1px solid var(--border); }
+  .intel-header { padding: 0.8rem 1rem; border-bottom: 1px solid #2A2E3A; }
+  .intel-title { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--amber); text-align: center; }
+  .intel-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.9rem; }
+  .intel-input {
+    width: 100%; padding: 0.5rem 0.6rem; background: #1B1E27; border: 1px solid #2A2E3A;
+    border-radius: 6px; color: #fff; font-family: var(--font-mono); font-size: 0.75rem;
+  }
+  .intel-input:focus { outline: none; border-color: var(--amber); }
+  .intel-label { font-size: 0.62rem; color: #9BA3AE; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; display: block; }
+  .intel-divider { border: none; border-top: 1px solid #2A2E3A; margin: 0; }
+
+  .intel-metric { background: #1B1E27; border: 1px solid #2A2E3A; border-radius: 6px; padding: 0.65rem; }
+  .intel-metric-top { display: flex; justify-content: space-between; align-items: center; }
+  .intel-metric-label { font-size: 0.62rem; color: #9BA3AE; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .intel-metric-value { font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: #E2685A; }
+  .intel-metric-value.amber { color: var(--amber); }
+  .intel-metric-list { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; max-height: 8rem; overflow-y: auto; }
+  .intel-metric-empty { color: #6B7280; font-style: italic; font-size: 0.65rem; text-align: center; padding: 0.5rem 0; }
+
+  .cheque-chip {
+    background: rgba(226,104,90,0.1); border: 1px solid rgba(226,104,90,0.3); border-radius: 5px;
+    padding: 0.4rem 0.55rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem;
+  }
+  .cheque-chip.amber-chip { background: rgba(227,168,87,0.1); border-color: rgba(227,168,87,0.3); }
+  .cheque-chip .chip-supplier { font-weight: 600; color: #fff; }
+  .cheque-chip .chip-num { font-family: var(--font-mono); font-size: 0.6rem; color: #9BA3AE; display: block; }
+  .cheque-chip .chip-amt { font-family: var(--font-mono); font-weight: 700; }
+
+  .upcoming-item {
+    background: #1B1E27; border-left: 3px solid var(--teal); border-radius: 5px; padding: 0.5rem 0.6rem;
+  }
+  .upcoming-top { display: flex; justify-content: space-between; font-weight: 600; color: #fff; font-size: 0.72rem; }
+  .upcoming-bottom { display: flex; justify-content: space-between; font-size: 0.62rem; color: #9BA3AE; margin-top: 0.25rem; }
+  .upcoming-bottom .due { color: var(--amber); font-family: var(--font-mono); }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 1150px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .stat-strip { grid-template-columns: 1fr 1fr; }
+    .shell { padding: 1rem 0.85rem 2rem; }
+    .field-row { grid-template-columns: 1fr; }
+  }
+
+  /* Focus visibility */
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--teal); outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <script>
+    // ⚠️ PASTE YOUR COPIED GOOGLE DEPLOYMENT LINK HERE:
+    const API_URL = "https://script.google.com/macros/s/AKfycbxWOqgjHPh7Yeuxj1vRKOTbnGJjAB0WRP4Ctcw5boTZHh5IfaCID8YnT8bvLZPGLvjK/exec";
+  </script>
+
+  <!-- TOP HEADER -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">SC</div>
+        <div class="brand-text">
+          <h1>SAP Computers</h1>
+          <span>Ledger &amp; Cheque Desk</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="connStatus" class="status-pill">Local API Node</span>
+        <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="error-banner hidden"></div>
+
+  <div class="shell">
+
+    <!-- STAT STRIP -->
+    <div class="stat-strip">
+      <div class="stat-card" style="--stat-color: var(--teal)">
+        <div class="stat-label">Filtered Invoices</div>
+        <div class="stat-value mono" id="cardCount">0</div>
+      </div>
+      <div class="stat-card" style="--stat-color: var(--rust)">
+        <div class="stat-label">Credit Balance Owed</div>
+        <div class="stat-value mono" id="cardCredit">0.00</div>
+      </div>
+      <div class="stat-card" style="--stat-color: var(--amber)">
+        <div class="stat-label">Outstanding Cheques</div>
+        <div class="stat-value mono" id="cardCheque">0.00</div>
+      </div>
+      <div class="stat-card" style="--stat-color: var(--teal)">
+        <div class="stat-label">Sum Total Outlays</div>
+        <div class="stat-value mono" id="cardTotal">0.00</div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+
+      <!-- LEFT: ENTRY PANEL -->
+      <div class="panel">
+        <div class="panel-body" style="padding-bottom: 0.6rem;">
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab-btn active" id="entryTabBtn_supplier" onclick="switchEntryTab('supplier')">Supplier</button>
+            <button type="button" class="tab-btn" id="entryTabBtn_transaction" onclick="switchEntryTab('transaction')">Transaction</button>
+          </div>
+        </div>
+
+        <!-- Supplier tab -->
+        <div class="panel-body" id="entryTab_supplier">
+          <form id="supplierForm" onsubmit="handleSupplierSubmit(event)">
+            <div class="field">
+              <label for="supName">Company Name</label>
+              <input type="text" id="supName" required class="input">
+            </div>
+            <div class="field">
+              <label for="supContact">Contact Person</label>
+              <input type="text" id="supContact" class="input">
+            </div>
+            <div class="field">
+              <label for="supPhone">Phone Number</label>
+              <input type="text" id="supPhone" required class="input mono-input">
+            </div>
+            <div class="field">
+              <label for="supEmail">Email (optional)</label>
+              <input type="email" id="supEmail" class="input">
+            </div>
+            <button type="submit" id="btnSaveSupplier" class="btn btn-primary btn-block">Save Supplier</button>
+          </form>
+
+          <hr class="intel-divider" style="margin: 1rem 0 0.75rem; border-top-color: var(--border);">
+
+          <div class="field" style="margin-bottom: 0.5rem;">
+            <label for="supplierListSearch">Registered Suppliers</label>
+            <input type="text" id="supplierListSearch" oninput="renderSupplierList()" placeholder="Search name, contact, or phone..." class="input">
+          </div>
+          <div id="supplierListContainer" class="supplier-list">
+            <p class="empty-state" style="padding: 1rem;">Loading suppliers...</p>
+          </div>
+        </div>
+
+        <!-- Transaction tab -->
+        <div class="panel-body hidden" id="entryTab_transaction">
+          <form id="transactionForm">
+            <div class="field">
+              <label for="txSupplier">Target Supplier</label>
+              <select id="txSupplier" required onchange="handleSupplierSelectionChange(this.value)" class="input">
+                <option value="">-- Choose Supplier --</option>
+              </select>
+            </div>
+
+            <div id="creditSettlementArea" class="hidden callout">
+              <span class="callout-label">🔗 Settle Outstanding Credit</span>
+              <div class="field" style="margin-bottom: 0.5rem;">
+                <label for="creditInvoiceSelect">Unsettled Credit Bill</label>
+                <select id="creditInvoiceSelect" onchange="autofillCreditBalance(this)" class="input"></select>
+              </div>
+              <div class="callout-balance">Remaining Balance: <strong id="lblCreditRemaining" class="mono">0.00</strong></div>
+            </div>
+
+            <div id="purchaseFieldsArea">
+              <div class="field-row">
+                <div class="field">
+                  <label for="txBillNum">Bill Number</label>
+                  <input type="text" id="txBillNum" class="input mono-input">
+                </div>
+                <div class="field">
+                  <label for="txBillDate">Bill Date</label>
+                  <input type="date" id="txBillDate" class="input mono-input">
+                </div>
+              </div>
+              <div class="field">
+                <label for="txDesc">Description / Items</label>
+                <input type="text" id="txDesc" placeholder="Processors, monitors, repairs etc" class="input">
+              </div>
+              <div class="field">
+                <label for="txTotalAmount">Total Bill Cost</label>
+                <input type="number" step="0.01" min="0.01" id="txTotalAmount" class="input mono-input">
+              </div>
+              <div class="field">
+                <label for="txInvoiceFile">Attach Invoice (optional)</label>
+                <input type="file" id="txInvoiceFile" accept=".pdf,.jpg,.jpeg,.png,.webp" class="input">
+                <p class="file-note">PDF or image, up to 5MB. Stored in Google Drive and linked to this bill.</p>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="txPayMethod">Payment Method</label>
+                <select id="txPayMethod" onchange="toggleChequeFields(this.value)" class="input">
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option id="optCreditDropdown" value="Credit">Credit (Buy on Book)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="txAmountPaid">Amount to Pay Now</label>
+                <input type="number" step="0.01" id="txAmountPaid" required class="input mono-input">
+              </div>
+            </div>
+            <p id="overpayWarning" class="hint hidden">⚠ Amount exceeds the remaining balance for this bill.</p>
+
+            <div id="chequeSection" class="hidden amber-box">
+              <div class="field">
+                <label for="txChequeNum">Cheque Number</label>
+                <input type="text" id="txChequeNum" class="input mono-input">
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label for="txChequeDue">Cheque Due Date</label>
+                <input type="date" id="txChequeDue" class="input mono-input">
+              </div>
+            </div>
+
+            <button type="submit" id="btnPostEntry" onclick="processFormAction(event)" class="btn btn-primary btn-block" style="margin-top: 0.9rem;">Post Entry Line</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- CENTER: LEDGER -->
+      <div class="panel">
+        <div class="panel-header" style="flex-wrap: wrap;">
+          <span class="panel-title">Purchasing Log</span>
+          <div class="filter-tabs">
+            <button class="tab-btn" id="btnF_All" onclick="setLedgerFilter('All')">All</button>
+            <button class="tab-btn active" id="btnF_Credit" onclick="setLedgerFilter('Credit Owed')">Credit Owed</button>
+            <button class="tab-btn" id="btnF_Cheque" onclick="setLedgerFilter('Uncleared Cheque')">Cheques</button>
+            <button class="tab-btn" id="btnF_Cleared" onclick="setLedgerFilter('Cleared')">Cleared</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="ledgerSearchInput" oninput="filterLedgerData()" placeholder="Search supplier, invoice ref, description, cheque #..." class="input">
+          </div>
+          <div id="ledgerListContainer" class="ledger-list">
+            <p class="empty-state">Connecting to secure storage...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: CHEQUE INTELLIGENCE -->
+      <div class="intel-panel">
+        <div class="intel-header">
+          <div class="intel-title">Cheque Intelligence Center</div>
+        </div>
+        <div class="intel-body">
+          <div>
+            <label class="intel-label">🔍 Filter Upcoming Outlays</label>
+            <input type="text" id="chequeSearchInput" oninput="runChequeSearch()" placeholder="Cheque #, supplier, or bill ref..." class="intel-input">
+          </div>
+
+          <hr class="intel-divider">
+
+          <div class="intel-metric">
+            <div class="intel-metric-top">
+              <span class="intel-metric-label">Due Today</span>
+              <span id="lblChequesDueTodayTotal" class="intel-metric-value mono">0.00</span>
+            </div>
+            <div id="containerDueToday" class="intel-metric-list">
+              <p class="intel-metric-empty">No payments maturing today.</p>
+            </div>
+          </div>
+
+          <div class="intel-metric">
+            <label class="intel-label" for="chequeTargetDateInput">Check Target Date Due</label>
+            <input type="date" id="chequeTargetDateInput" onchange="runTargetDateChequeAnalysis()" class="intel-input" style="margin-bottom: 0.5rem;">
+            <div class="intel-metric-top" style="border-top: 1px solid #2A2E3A; padding-top: 0.4rem;">
+              <span class="intel-metric-label">Selected Day Total</span>
+              <span id="lblChequesTargetTotal" class="intel-metric-value amber mono">0.00</span>
+            </div>
+            <div id="containerTargetDate" class="intel-metric-list">
+              <p class="intel-metric-empty">Pick a date to run audit...</p>
+            </div>
+          </div>
+
+          <hr class="intel-divider">
+
+          <div>
+            <label class="intel-label">Upcoming Pending Outlays</label>
+            <div id="containerUpcoming" class="intel-metric-list" style="max-height: 12rem;">
+              <p class="intel-metric-empty">Checking active bank outlays...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- COMPLETE RUNTIME CONTROLLER JS -->
+  <script>
+    let cachedLedgerList = [];
+    let cachedChequeMasterList = [];
+    let cachedSupplierList = [];
+    let currentFilterTab = 'Credit Owed';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('sap_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', savedTheme);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (document.getElementById('txBillDate')) document.getElementById('txBillDate').value = todayStr;
+      if (document.getElementById('chequeTargetDateInput')) document.getElementById('chequeTargetDateInput').value = todayStr;
+
+      loadDropdownSuppliers();
+      reloadSystemData();
+    });
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('sap_theme', next);
+    }
+
+    function switchEntryTab(tab) {
+      const isSupplier = tab === 'supplier';
+      document.getElementById('entryTab_supplier').classList.toggle('hidden', !isSupplier);
+      document.getElementById('entryTab_transaction').classList.toggle('hidden', isSupplier);
+      document.getElementById('entryTabBtn_supplier').classList.toggle('active', isSupplier);
+      document.getElementById('entryTabBtn_transaction').classList.toggle('active', !isSupplier);
+    }
+
+    // ---------- ERROR HANDLING HELPERS ----------
+    function showError(msg) {
+      const banner = document.getElementById('errorBanner');
+      banner.textContent = '⚠ ' + msg;
+      banner.classList.remove('hidden');
+      clearTimeout(showError._t);
+      showError._t = setTimeout(() => banner.classList.add('hidden'), 6000);
+    }
+
+    function safeFetchJSON(url, options) {
+      return fetch(url, options)
+        .then(res => {
+          if (!res.ok) throw new Error('Network response was not OK (status ' + res.status + ')');
+          return res.json();
+        })
+        .catch(err => {
+          showError('Connection problem: ' + err.message + '. Check your internet connection or API URL.');
+          throw err;
+        });
+    }
+
+    function setButtonLoading(btnId, isLoading, loadingText, normalText) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.disabled = isLoading;
+      btn.textContent = isLoading ? loadingText : normalText;
+      btn.style.opacity = isLoading ? '0.6' : '1';
+    }
+
+    // ---------- LEDGER FILTER TABS ----------
+    function setLedgerFilter(tab) {
+      currentFilterTab = tab;
+      const tabs = ['All', 'Credit Owed', 'Uncleared Cheque', 'Cleared'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('btnF_' + (t === 'Credit Owed' ? 'Credit' : t === 'Uncleared Cheque' ? 'Cheque' : t));
+        btn.classList.toggle('active', t === tab);
+      });
+      filterLedgerData();
+    }
+
+    function toggleChequeFields(value) {
+      const section = document.getElementById('chequeSection');
+      const isChq = (value === 'Cheque');
+      section.classList.toggle('hidden', !isChq);
+      document.getElementById('txChequeNum').required = isChq;
+      document.getElementById('txChequeDue').required = isChq;
+
+      if (value === 'Credit') {
+        document.getElementById('txAmountPaid').value = 0;
+        document.getElementById('txAmountPaid').readOnly = true;
+      } else {
+        document.getElementById('txAmountPaid').readOnly = false;
+      }
+      validateAmountAgainstBalance();
+    }
+
+    // ---------- OVERPAYMENT CLIENT-SIDE GUARD ----------
+    function getSelectedCreditBalance() {
+      const cSelect = document.getElementById('creditInvoiceSelect');
+      const cArea = document.getElementById('creditSettlementArea');
+      if (cArea.classList.contains('hidden') || cSelect.value === 'NEW_PURCHASE' || !cSelect.value) return null;
+      const opt = cSelect.options[cSelect.selectedIndex];
+      return parseFloat(opt.getAttribute('data-bal')) || 0;
+    }
+
+    function validateAmountAgainstBalance() {
+      const warning = document.getElementById('overpayWarning');
+      const bal = getSelectedCreditBalance();
+      const amt = parseFloat(document.getElementById('txAmountPaid').value) || 0;
+      if (bal !== null && amt > bal + 0.05) {
+        warning.classList.remove('hidden');
+      } else {
+        warning.classList.add('hidden');
+      }
+    }
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id === 'txAmountPaid') validateAmountAgainstBalance();
+    });
+
+    function handleSupplierSelectionChange(supId) {
+      const cArea = document.getElementById('creditSettlementArea');
+      const pArea = document.getElementById('purchaseFieldsArea');
+      const select = document.getElementById('creditInvoiceSelect');
+      const creditOpt = document.getElementById('optCreditDropdown');
+
+      if (!supId) {
+        cArea.classList.add('hidden');
+        pArea.classList.remove('hidden');
+        creditOpt.classList.remove('hidden');
+        return;
+      }
+
+      safeFetchJSON(`${API_URL}?action=getSupplierOpenCredits&supplierId=${supId}`)
+        .then(credits => {
+          if (credits.length === 0) {
+            cArea.classList.add('hidden');
+            pArea.classList.remove('hidden');
+            creditOpt.classList.remove('hidden');
+            select.innerHTML = '';
+          } else {
+            cArea.classList.remove('hidden');
+            pArea.classList.add('hidden');
+
+            select.innerHTML = '<option value="NEW_PURCHASE">-- Create Brand New Bill Instead --</option>';
+            credits.forEach(c => {
+              select.innerHTML += `<option value="${c.purchaseId}" data-bal="${c.balance}">Inv: ${escapeHtml(c.billNumber)} (${escapeHtml(c.description)})</option>`;
+            });
+            autofillCreditBalance(select);
+          }
+        })
+        .catch(() => {});
+    }
+
+    function autofillCreditBalance(elem) {
+      const pArea = document.getElementById('purchaseFieldsArea');
+      const lbl = document.getElementById('lblCreditRemaining');
+      const creditOpt = document.getElementById('optCreditDropdown');
+      const pmSelect = document.getElementById('txPayMethod');
+
+      if (elem.value === 'NEW_PURCHASE') {
+        pArea.classList.remove('hidden');
+        creditOpt.classList.remove('hidden');
+        lbl.innerText = '0.00';
+        document.getElementById('txAmountPaid').value = '';
+        document.getElementById('txAmountPaid').readOnly = false;
+      } else {
+        pArea.classList.add('hidden');
+        creditOpt.classList.add('hidden');
+        if (pmSelect.value === 'Credit') pmSelect.value = 'Cash';
+
+        const selectedOpt = elem.options[elem.selectedIndex];
+        const bal = parseFloat(selectedOpt.getAttribute('data-bal')) || 0;
+        lbl.innerText = bal.toFixed(2);
+        document.getElementById('txAmountPaid').value = bal.toFixed(2);
+        document.getElementById('txAmountPaid').readOnly = false;
+      }
+      toggleChequeFields(pmSelect.value);
+      validateAmountAgainstBalance();
+    }
+
+    function loadDropdownSuppliers() {
+      safeFetchJSON(`${API_URL}?action=getSuppliers`)
+        .then(suppliers => {
+          cachedSupplierList = suppliers;
+
+          const select = document.getElementById('txSupplier');
+          select.innerHTML = '<option value="">-- Choose Supplier --</option>';
+          suppliers.forEach(s => { select.innerHTML += `<option value="${s.id}">${escapeHtml(s.name)}</option>`; });
+
+          renderSupplierList();
+        })
+        .catch(() => {
+          document.getElementById('supplierListContainer').innerHTML =
+            '<p class="empty-state">Failed to load suppliers.</p>';
+        });
+    }
+
+    // ---------- REGISTERED SUPPLIERS: VIEW + SEARCH ----------
+    function renderSupplierList() {
+      const searchBox = document.getElementById('supplierListSearch');
+      const search = searchBox ? searchBox.value.toLowerCase().trim() : '';
+      const container = document.getElementById('supplierListContainer');
+
+      const filtered = cachedSupplierList.filter(s => {
+        if (!search) return true;
+        return String(s.name || '').toLowerCase().includes(search) ||
+               String(s.contact || '').toLowerCase().includes(search) ||
+               String(s.phone || '').toLowerCase().includes(search) ||
+               String(s.email || '').toLowerCase().includes(search);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="empty-state" style="padding: 1rem;">${cachedSupplierList.length === 0 ? 'No suppliers registered yet.' : 'No suppliers match your search.'}</p>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(s => `
+        <div class="supplier-card">
+          <span class="supplier-card-id">${escapeHtml(s.id)}</span>
+          <div class="supplier-card-name">${escapeHtml(s.name)}</div>
+          ${s.contact ? `<div class="supplier-card-row">👤 <strong>${escapeHtml(s.contact)}</strong></div>` : ''}
+          ${s.phone ? `<div class="supplier-card-row">📞 <strong>${escapeHtml(s.phone)}</strong></div>` : ''}
+          ${s.email ? `<div class="supplier-card-row">✉️ <strong>${escapeHtml(s.email)}</strong></div>` : ''}
+          ${(!s.contact && !s.phone && !s.email) ? `<div class="supplier-card-row">No additional contact details on file.</div>` : ''}
+        </div>`).join('');
+    }
+
+    function reloadSystemData() {
+      safeFetchJSON(`${API_URL}?action=getPurchasesList`)
+        .then(list => {
+          cachedLedgerList = list;
+          filterLedgerData();
+        })
+        .catch(() => {
+          document.getElementById('ledgerListContainer').innerHTML =
+            '<p class="empty-state">Failed to load ledger data. Check your connection and try again.</p>';
+        });
+
+      safeFetchJSON(`${API_URL}?action=getUpcomingCheques`)
+        .then(cheques => {
+          cachedChequeMasterList = cheques;
+
+          // Route through the search filter so any cheque # already typed
+          // stays applied to the Upcoming Pending Outlays list on reload.
+          runChequeSearch();
+
+          runTodayChequesAnalysis();
+          runTargetDateChequeAnalysis();
+        })
+        .catch(() => {
+          document.getElementById('containerUpcoming').innerHTML =
+            '<p class="intel-metric-empty">Failed to load cheque data.</p>';
+        });
+    }
+
+    // ---------- UPCOMING PENDING OUTLAYS: RENDER + FILTER ----------
+    function renderUpcomingList(cheques, isSearchActive) {
+      const container = document.getElementById('containerUpcoming');
+      container.innerHTML = '';
+      if (cheques.length === 0) {
+        container.innerHTML = isSearchActive
+          ? '<p class="intel-metric-empty">No pending outlays match that cheque #.</p>'
+          : '<p class="intel-metric-empty">All issued cheques cleared.</p>';
+        return;
+      }
+      cheques.forEach(item => {
+        container.innerHTML += `
+          <div class="upcoming-item">
+            <div class="upcoming-top"><span>${escapeHtml(item.supplier)}</span><span class="mono">${item.amount.toFixed(2)}</span></div>
+            <div class="upcoming-bottom"><span>Chq: ${escapeHtml(String(item.chequeNum))}</span><span class="due">Due: ${item.dueDate}</span></div>
+          </div>`;
+      });
+    }
+
+    function runTodayChequesAnalysis() {
+      const localToday = new Date().toLocaleDateString('sv-SE');
+      const todayCheques = cachedChequeMasterList.filter(c => c.dueDate === localToday);
+
+      const lbl = document.getElementById('lblChequesDueTodayTotal');
+      const container = document.getElementById('containerDueToday');
+
+      let sum = 0;
+      container.innerHTML = '';
+
+      todayCheques.forEach(c => {
+        sum += c.amount;
+        container.innerHTML += `
+          <div class="cheque-chip">
+            <div><span class="chip-supplier">${escapeHtml(c.supplier)}</span><span class="chip-num">Chq: ${escapeHtml(String(c.chequeNum))}</span></div>
+            <div class="chip-amt">${c.amount.toFixed(2)}</div>
+          </div>`;
+      });
+
+      lbl.innerText = sum.toFixed(2);
+      if (todayCheques.length === 0) {
+        container.innerHTML = '<p class="intel-metric-empty">No payments maturing today.</p>';
+      }
+    }
+
+    function runTargetDateChequeAnalysis() {
+      const selectedDate = document.getElementById('chequeTargetDateInput').value;
+      const lbl = document.getElementById('lblChequesTargetTotal');
+      const container = document.getElementById('containerTargetDate');
+
+      if (!selectedDate) {
+        lbl.innerText = '0.00';
+        container.innerHTML = '<p class="intel-metric-empty">Pick a date to run audit...</p>';
+        return;
+      }
+
+      const matchCheques = cachedChequeMasterList.filter(c => c.dueDate === selectedDate);
+      let sum = 0;
+      container.innerHTML = '';
+
+      matchCheques.forEach(c => {
+        sum += c.amount;
+        container.innerHTML += `
+          <div class="cheque-chip amber-chip">
+            <div><span class="chip-supplier">${escapeHtml(c.supplier)}</span><span class="chip-num">Chq: ${escapeHtml(String(c.chequeNum))}</span></div>
+            <div class="chip-amt">${c.amount.toFixed(2)}</div>
+          </div>`;
+      });
+
+      lbl.innerText = sum.toFixed(2);
+      if (matchCheques.length === 0) {
+        container.innerHTML = '<p class="intel-metric-empty">No cheques due on this day.</p>';
+      }
+    }
+
+    // ---------- SEARCH ----------
+    // Filters the "Upcoming Pending Outlays" list by cheque #, supplier name, or bill ref.
+    function runChequeSearch() {
+      const search = document.getElementById('chequeSearchInput').value.toLowerCase().trim();
+
+      if (!search) {
+        renderUpcomingList(cachedChequeMasterList, false);
+        return;
+      }
+
+      const filtered = cachedChequeMasterList.filter(c =>
+        String(c.chequeNum || '').toLowerCase().includes(search) ||
+        String(c.supplier || '').toLowerCase().includes(search) ||
+        String(c.billNumber || '').toLowerCase().includes(search)
+      );
+      renderUpcomingList(filtered, true);
+    }
+
+    function filterLedgerData() {
+      const search = document.getElementById('ledgerSearchInput').value.toLowerCase().trim();
+      const container = document.getElementById('ledgerListContainer');
+      container.innerHTML = '';
+
+      let filteredCount = 0;
+      let filteredCredit = 0;
+      let filteredCheque = 0;
+      let filteredTotalSum = 0;
+
+      const effectiveTab = search ? 'All' : currentFilterTab;
+
+      const filteredRows = cachedLedgerList.filter(item => {
+        const matchesTab = (effectiveTab === 'All' || item.status === effectiveTab);
+        if (!search) return matchesTab;
+
+        const supplierName = String(item.supplierName || '').toLowerCase();
+        const billNumber = String(item.billNumber || '').toLowerCase();
+        const description = String(item.description || '').toLowerCase();
+        const chqNumberString = String(item.chequeNumber || '').toLowerCase();
+
+        const matchesSearch = supplierName.includes(search) ||
+                               billNumber.includes(search) ||
+                               description.includes(search) ||
+                               chqNumberString.includes(search);
+        return matchesTab && matchesSearch;
+      });
+
+      filteredRows.forEach(item => {
+        filteredCount++;
+        filteredCredit += item.balance;
+        filteredTotalSum += item.totalAmount;
+        filteredCheque += item.pendingChequeAmount || 0;
+      });
+
+      document.getElementById('cardCount').innerText = filteredCount;
+      document.getElementById('cardCredit').innerText = filteredCredit.toFixed(2);
+      document.getElementById('cardCheque').innerText = filteredCheque.toFixed(2);
+      document.getElementById('cardTotal').innerText = filteredTotalSum.toFixed(2);
+
+      if (filteredRows.length === 0) {
+        container.innerHTML = '<p class="empty-state">No items match your active tab and filter terms.</p>';
+        return;
+      }
+
+      filteredRows.forEach(item => {
+        let stampClass = 'stamp-cleared';
+        if (item.status === 'Credit Owed') stampClass = 'stamp-owed';
+        else if (item.status === 'Uncleared Cheque') stampClass = 'stamp-cheque';
+
+        const displayChequeMeta = item.chequeNumber ? `<div class="ledger-cheque-tag">🎫 Linked Cheque: #${escapeHtml(item.chequeNumber)}</div>` : '';
+
+        const clearBtn = item.status === 'Uncleared Cheque'
+          ? `<button onclick="handleMarkChequeCleared('${item.id}')" class="btn btn-amber">Mark Cleared</button>`
+          : '';
+        const deleteBtn = `<button onclick="handleDeletePurchase('${item.id}', '${escapeHtml(item.supplierName).replace(/'/g, "&#39;")}')" class="btn btn-danger">Delete</button>`;
+        const invoiceBtn = item.invoiceUrl
+          ? `<a href="${escapeHtml(item.invoiceUrl)}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none;">📎 Invoice</a>`
+          : '';
+
+        container.innerHTML += `
+          <div class="ledger-row">
+            <div class="ledger-row-top">
+              <div>
+                <div class="ledger-supplier">${escapeHtml(item.supplierName)}</div>
+                <div class="ledger-desc">${escapeHtml(item.description)}</div>
+                ${displayChequeMeta}
+              </div>
+              <div class="ledger-figures">
+                <div class="amt-total">${item.totalAmount.toFixed(2)}</div>
+                <div class="amt-paid">Paid ${item.amountPaid.toFixed(2)}</div>
+                ${item.balance > 0 ? `<div class="amt-bal">Bal ${item.balance.toFixed(2)}</div>` : ''}
+                <div style="margin-top:0.3rem;"><span class="stamp ${stampClass}">${item.status}</span></div>
+              </div>
+            </div>
+            <div class="ledger-meta">
+              <span>Ref: <strong>${escapeHtml(item.billNumber)}</strong></span>
+              <span>Date: <strong>${item.billDate}</strong></span>
+            </div>
+            <div class="ledger-actions">
+              ${invoiceBtn}
+              ${clearBtn}
+              ${deleteBtn}
+            </div>
+          </div>`;
+      });
+    }
+
+    // ---------- ROW ACTIONS: DELETE / MARK CLEARED ----------
+    function handleDeletePurchase(purchaseId, supplierName) {
+      if (!confirm(`Delete this purchase for "${supplierName}"?\nThis will also delete all payments linked to it. This cannot be undone.`)) return;
+
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deletePurchase', data: { purchaseId } }) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          reloadSystemData();
+        })
+        .catch(() => {});
+    }
+
+    function handleMarkChequeCleared(purchaseId) {
+      if (!confirm('Mark the pending cheque(s) on this bill as cleared?')) return;
+
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markChequeCleared', data: { purchaseId } }) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          reloadSystemData();
+        })
+        .catch(() => {});
+    }
+
+    // ---------- OPTIONAL INVOICE FILE ----------
+    const MAX_INVOICE_BYTES = 5 * 1024 * 1024; // 5MB
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result || '';
+          const base64 = String(result).split(',')[1] || '';
+          resolve({ base64, mimeType: file.type || 'application/octet-stream', filename: file.name });
+        };
+        reader.onerror = () => reject(new Error('Could not read the selected invoice file.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ---------- FORM SUBMISSION ----------
+    function processFormAction(e) {
+      e.preventDefault();
+      const supId = document.getElementById('txSupplier').value;
+      if (!supId) { showError('Please select a supplier.'); return; }
+
+      const cSelect = document.getElementById('creditInvoiceSelect');
+      const isCreditSettlement = (document.getElementById('creditSettlementArea').classList.contains('hidden') === false) && (cSelect.value !== 'NEW_PURCHASE');
+
+      const amountPaid = parseFloat(document.getElementById('txAmountPaid').value) || 0;
+      const payMethod = document.getElementById('txPayMethod').value;
+      if (payMethod === 'Cheque') {
+        if (!document.getElementById('txChequeNum').value.trim()) { showError('Cheque number is required.'); return; }
+        if (!document.getElementById('txChequeDue').value) { showError('Cheque due date is required.'); return; }
+      }
+
+      const bal = getSelectedCreditBalance();
+      if (bal !== null && amountPaid > bal + 0.05) {
+        showError('Amount paid (' + amountPaid.toFixed(2) + ') exceeds the remaining balance (' + bal.toFixed(2) + ').');
+        return;
+      }
+
+      setButtonLoading('btnPostEntry', true, 'Posting...', 'Post Entry Line');
+
+      if (isCreditSettlement) {
+        const paymentPayload = {
+          action: 'addPayment',
+          data: {
+            purchaseId: cSelect.value,
+            paymentDate: new Date().toISOString().split('T')[0],
+            paymentMethod: payMethod,
+            amountPaid: amountPaid,
+            chequeNumber: document.getElementById('txChequeNum').value,
+            chequeDueDate: document.getElementById('txChequeDue').value
+          }
+        };
+
+        safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify(paymentPayload) })
+          .then(res => {
+            if (!res.success) { showError(res.message); return; }
+            alert('Credit transaction settled successfully.');
+            resetTransactionForm();
+            reloadSystemData();
+          })
+          .catch(() => {})
+          .finally(() => setButtonLoading('btnPostEntry', false, 'Posting...', 'Post Entry Line'));
+      } else {
+        const totalAmount = parseFloat(document.getElementById('txTotalAmount').value);
+        if (!totalAmount || totalAmount <= 0) {
+          showError('Please enter a valid total bill amount.');
+          setButtonLoading('btnPostEntry', false, 'Posting...', 'Post Entry Line');
+          return;
+        }
+
+        const invoiceInput = document.getElementById('txInvoiceFile');
+        const selectedInvoice = invoiceInput && invoiceInput.files[0] ? invoiceInput.files[0] : null;
+        if (selectedInvoice && selectedInvoice.size > MAX_INVOICE_BYTES) {
+          showError('Invoice file is too large. Please attach a file under 5MB.');
+          setButtonLoading('btnPostEntry', false, 'Posting...', 'Post Entry Line');
+          return;
+        }
+
+        readFileAsBase64(selectedInvoice)
+          .then(invoiceFile => {
+            const purchasePayload = {
+              action: 'addPurchase',
+              data: {
+                supplierId: supId,
+                billNumber: document.getElementById('txBillNum').value || 'INV-NEW',
+                billDate: document.getElementById('txBillDate').value || new Date().toISOString().split('T')[0],
+                description: document.getElementById('txDesc').value || 'Purchase Invoice',
+                totalAmount: totalAmount,
+                invoiceFile: invoiceFile // null when no file was attached
+              }
+            };
+
+            return safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify(purchasePayload) })
+              .then(pRes => {
+                if (!pRes.success) { showError(pRes.message); throw new Error('stop'); }
+
+                if (amountPaid <= 0 && payMethod !== 'Credit') {
+                  return { success: true };
+                }
+
+                const paymentPayload = {
+                  action: 'addPayment',
+                  data: {
+                    purchaseId: pRes.purchaseId,
+                    paymentDate: purchasePayload.data.billDate,
+                    paymentMethod: payMethod,
+                    amountPaid: amountPaid,
+                    chequeNumber: document.getElementById('txChequeNum').value,
+                    chequeDueDate: document.getElementById('txChequeDue').value
+                  }
+                };
+                return safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify(paymentPayload) });
+              });
+          })
+          .then(res => {
+            if (!res) return;
+            if (!res.success) { showError(res.message); return; }
+            alert('New purchase and initial payment logged.');
+            resetTransactionForm();
+            reloadSystemData();
+          })
+          .catch(err => {
+            if (err && err.message && err.message !== 'stop') showError(err.message);
+          })
+          .finally(() => setButtonLoading('btnPostEntry', false, 'Posting...', 'Post Entry Line'));
+      }
+    }
+
+    function resetTransactionForm() {
+      document.getElementById('transactionForm').reset();
+      document.getElementById('creditSettlementArea').classList.add('hidden');
+      document.getElementById('purchaseFieldsArea').classList.remove('hidden');
+      document.getElementById('optCreditDropdown').classList.remove('hidden');
+      document.getElementById('txBillDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('overpayWarning').classList.add('hidden');
+      toggleChequeFields('Cash');
+    }
+
+    function handleSupplierSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('supName').value.trim();
+      const phone = document.getElementById('supPhone').value.trim();
+      if (!name) { showError('Supplier name is required.'); return; }
+      if (!phone) { showError('Phone number is required.'); return; }
+
+      const payload = {
+        action: 'addSupplier',
+        data: {
+          name: name,
+          contact: document.getElementById('supContact').value.trim(),
+          phone: phone,
+          email: document.getElementById('supEmail').value.trim()
+        }
+      };
+
+      setButtonLoading('btnSaveSupplier', true, 'Saving...', 'Save Supplier');
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          alert(res.message);
+          document.getElementById('supplierForm').reset();
+          loadDropdownSuppliers();
+        })
+        .catch(() => {})
+        .finally(() => setButtonLoading('btnSaveSupplier', false, 'Saving...', 'Save Supplier'));
+    }
+
+    // ---------- UTIL ----------
+    function escapeHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
