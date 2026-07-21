@@ -970,7 +970,7 @@
         const deleteBtn = `<button onclick="handleDeletePurchase('${item.id}', '${escapeHtml(item.supplierName).replace(/'/g, "&#39;")}')" class="btn btn-danger">Delete</button>`;
         const invoiceBtn = item.invoiceUrl
           ? `<a href="${escapeHtml(item.invoiceUrl)}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none;">📎 Invoice</a>`
-          : '';
+          : `<button onclick="handleAttachInvoiceClick('${item.id}')" class="btn btn-secondary">📎 Attach Invoice</button>`;
 
         container.innerHTML += `
           <div class="ledger-row">
@@ -1040,6 +1040,35 @@
       });
     }
 
+    // Lets the user attach an invoice to a purchase that doesn't have one yet
+    // (either it was never attached, or the original upload failed).
+    function handleAttachInvoiceClick(purchaseId) {
+      const picker = document.createElement('input');
+      picker.type = 'file';
+      picker.accept = '.pdf,.jpg,.jpeg,.png,.webp';
+      picker.onchange = () => {
+        const file = picker.files[0];
+        if (!file) return;
+        if (file.size > MAX_INVOICE_BYTES) {
+          showError('Invoice file is too large. Please attach a file under 5MB.');
+          return;
+        }
+        readFileAsBase64(file)
+          .then(invoiceFile => safeFetchJSON(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'attachInvoice', data: { purchaseId, invoiceFile } })
+          }))
+          .then(res => {
+            if (!res.success) { showError(res.message); return; }
+            reloadSystemData();
+          })
+          .catch(err => {
+            if (err && err.message) showError(err.message);
+          });
+      };
+      picker.click();
+    }
+
     // ---------- FORM SUBMISSION ----------
     function processFormAction(e) {
       e.preventDefault();
@@ -1102,6 +1131,8 @@
           return;
         }
 
+        let invoiceUploadWarning = '';
+
         readFileAsBase64(selectedInvoice)
           .then(invoiceFile => {
             const purchasePayload = {
@@ -1119,6 +1150,7 @@
             return safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify(purchasePayload) })
               .then(pRes => {
                 if (!pRes.success) { showError(pRes.message); throw new Error('stop'); }
+                if (pRes.invoiceUploadError) invoiceUploadWarning = pRes.invoiceUploadError;
 
                 if (amountPaid <= 0 && payMethod !== 'Credit') {
                   return { success: true };
@@ -1142,6 +1174,9 @@
             if (!res) return;
             if (!res.success) { showError(res.message); return; }
             alert('New purchase and initial payment logged.');
+            if (invoiceUploadWarning) {
+              showError('Purchase saved, but the invoice file failed to upload (' + invoiceUploadWarning + '). Use the "Attach Invoice" button on this entry to retry.');
+            }
             resetTransactionForm();
             reloadSystemData();
           })
