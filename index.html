@@ -475,6 +475,7 @@
           <div class="tabs" role="tablist">
             <button type="button" class="tab-btn active" id="entryTabBtn_supplier" onclick="switchEntryTab('supplier')">Supplier</button>
             <button type="button" class="tab-btn" id="entryTabBtn_transaction" onclick="switchEntryTab('transaction')">Transaction</button>
+            <button type="button" class="tab-btn hidden" id="entryTabBtn_users" onclick="switchEntryTab('users')">Users</button>
           </div>
         </div>
 
@@ -587,6 +588,48 @@
             <button type="submit" id="btnPostEntry" onclick="processFormAction(event)" class="btn btn-primary btn-block" style="margin-top: 0.9rem;">Post Entry Line</button>
           </form>
         </div>
+
+        <!-- Users tab (admin only) -->
+        <div class="panel-body hidden" id="entryTab_users">
+          <div class="callout" style="margin-bottom: 1rem;">
+            <span class="callout-label">🔐 Confirm Admin Password</span>
+            <input type="password" id="adminConfirmInput" placeholder="Your password, to authorize account changes" oninput="adminConfirmPassword = this.value" class="input" autocomplete="current-password">
+          </div>
+
+          <form id="addUserForm" onsubmit="handleAddUserSubmit(event)">
+            <div class="field">
+              <label for="newUserName">Username</label>
+              <input type="text" id="newUserName" required class="input mono-input">
+            </div>
+            <div class="field">
+              <label for="newUserDisplayName">Display Name</label>
+              <input type="text" id="newUserDisplayName" class="input">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="newUserPassword">Password</label>
+                <input type="password" id="newUserPassword" required class="input">
+              </div>
+              <div class="field">
+                <label for="newUserRole">Role</label>
+                <select id="newUserRole" class="input">
+                  <option value="staff">Staff</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" id="btnAddUser" class="btn btn-primary btn-block">Create Account</button>
+          </form>
+
+          <hr class="intel-divider" style="margin: 1rem 0 0.75rem; border-top-color: var(--border);">
+
+          <div class="field" style="margin-bottom: 0.5rem;">
+            <label>Existing Accounts</label>
+          </div>
+          <div id="usersListContainer" class="supplier-list">
+            <p class="empty-state" style="padding: 1rem;">Enter your password above, then open this tab to load accounts.</p>
+          </div>
+        </div>
       </div>
 
       <!-- CENTER: LEDGER -->
@@ -673,7 +716,9 @@
     let cachedChequeMasterList = [];
     let cachedSupplierList = [];
     let currentFilterTab = 'Credit Owed';
-    let currentUser = null; // { username, displayName }
+    let currentUser = null; // { username, displayName, role }
+    let adminConfirmPassword = ''; // held in memory only, never persisted
+    let cachedUsersList = [];
 
     const SESSION_KEY = 'sap_ledger_session';
 
@@ -733,6 +778,10 @@
         document.getElementById('userPillName').textContent = currentUser.displayName || currentUser.username;
       }
 
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      document.getElementById('entryTabBtn_users').classList.toggle('hidden', !isAdmin);
+      if (!isAdmin) switchEntryTab('supplier');
+
       loadDropdownSuppliers();
       reloadSystemData();
     }
@@ -755,7 +804,7 @@
             errBox.classList.remove('hidden');
             return;
           }
-          currentUser = { username: res.username, displayName: res.displayName };
+          currentUser = { username: res.username, displayName: res.displayName, role: res.role || 'staff' };
           localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
           document.getElementById('loginForm').reset();
           showApp();
@@ -767,6 +816,8 @@
     function handleLogout() {
       if (!confirm('Sign out of the ledger desk?')) return;
       currentUser = null;
+      adminConfirmPassword = '';
+      cachedUsersList = [];
       localStorage.removeItem(SESSION_KEY);
       showLogin();
     }
@@ -779,11 +830,12 @@
     }
 
     function switchEntryTab(tab) {
-      const isSupplier = tab === 'supplier';
-      document.getElementById('entryTab_supplier').classList.toggle('hidden', !isSupplier);
-      document.getElementById('entryTab_transaction').classList.toggle('hidden', isSupplier);
-      document.getElementById('entryTabBtn_supplier').classList.toggle('active', isSupplier);
-      document.getElementById('entryTabBtn_transaction').classList.toggle('active', !isSupplier);
+      const tabs = ['supplier', 'transaction', 'users'];
+      tabs.forEach(t => {
+        document.getElementById('entryTab_' + t).classList.toggle('hidden', t !== tab);
+        document.getElementById('entryTabBtn_' + t).classList.toggle('active', t === tab);
+      });
+      if (tab === 'users') loadUsersList();
     }
 
     // ---------- ERROR HANDLING HELPERS ----------
@@ -1535,6 +1587,99 @@
         })
         .catch(() => {})
         .finally(() => setButtonLoading('btnSaveSupplier', false, 'Saving...', 'Save Supplier'));
+    }
+
+    // ---------- ADMIN: USER ACCOUNT MANAGEMENT ----------
+    function requireAdminConfirm() {
+      if (!adminConfirmPassword) {
+        showError('Enter your admin password at the top of this tab first.');
+        return false;
+      }
+      return true;
+    }
+
+    function loadUsersList() {
+      if (!currentUser || currentUser.role !== 'admin') return;
+      if (!adminConfirmPassword) {
+        document.getElementById('usersListContainer').innerHTML =
+          '<p class="empty-state" style="padding: 1rem;">Enter your password above, then open this tab to load accounts.</p>';
+        return;
+      }
+
+      const payload = { requestingUsername: currentUser.username, requestingPassword: adminConfirmPassword };
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'listUsers', data: payload }) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          cachedUsersList = res.users;
+          renderUsersList();
+        })
+        .catch(() => {});
+    }
+
+    function renderUsersList() {
+      const container = document.getElementById('usersListContainer');
+      if (cachedUsersList.length === 0) {
+        container.innerHTML = '<p class="empty-state" style="padding: 1rem;">No accounts to show yet.</p>';
+        return;
+      }
+
+      container.innerHTML = cachedUsersList.map(u => {
+        const isSelf = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
+        const roleBadge = u.role === 'admin' ? 'stamp-owed' : 'stamp-cleared';
+        const deleteBtn = isSelf
+          ? ''
+          : `<button onclick="handleDeleteUser('${escapeHtml(u.username).replace(/'/g, "&#39;")}')" class="btn btn-danger" style="margin-top:0.4rem;">Remove</button>`;
+        return `
+          <div class="supplier-card">
+            <span class="supplier-card-id"><span class="stamp ${roleBadge}" style="transform:none;">${escapeHtml(u.role)}</span></span>
+            <div class="supplier-card-name">${escapeHtml(u.displayName)} ${isSelf ? '(you)' : ''}</div>
+            <div class="supplier-card-row">👤 <strong>${escapeHtml(u.username)}</strong></div>
+            ${u.lastLogin ? `<div class="supplier-card-row">🕓 Last login: <strong>${escapeHtml(u.lastLogin)}</strong></div>` : `<div class="supplier-card-row">🕓 Never logged in yet</div>`}
+            ${deleteBtn}
+          </div>`;
+      }).join('');
+    }
+
+    function handleAddUserSubmit(e) {
+      e.preventDefault();
+      if (!requireAdminConfirm()) return;
+
+      const payload = {
+        requestingUsername: currentUser.username,
+        requestingPassword: adminConfirmPassword,
+        username: document.getElementById('newUserName').value.trim(),
+        displayName: document.getElementById('newUserDisplayName').value.trim(),
+        password: document.getElementById('newUserPassword').value,
+        role: document.getElementById('newUserRole').value
+      };
+      if (!payload.username || !payload.password) { showError('Username and password are required.'); return; }
+
+      setButtonLoading('btnAddUser', true, 'Creating...', 'Create Account');
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addLoginUser', data: payload }) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          document.getElementById('addUserForm').reset();
+          loadUsersList();
+        })
+        .catch(() => {})
+        .finally(() => setButtonLoading('btnAddUser', false, 'Creating...', 'Create Account'));
+    }
+
+    function handleDeleteUser(username) {
+      if (!requireAdminConfirm()) return;
+      if (!confirm(`Remove the account "${username}"? This cannot be undone.`)) return;
+
+      const payload = {
+        requestingUsername: currentUser.username,
+        requestingPassword: adminConfirmPassword,
+        targetUsername: username
+      };
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteLoginUser', data: payload }) })
+        .then(res => {
+          if (!res.success) { showError(res.message); return; }
+          loadUsersList();
+        })
+        .catch(() => {});
     }
 
     // ---------- UTIL ----------
