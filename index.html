@@ -82,8 +82,9 @@
     background: var(--teal); color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-mono); font-weight: 700; font-size: 13px;
-    flex-shrink: 0;
+    flex-shrink: 0; overflow: hidden; padding: 3px;
   }
+  .brand-mark img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
   .brand-text h1 { font-size: 0.95rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
   .brand-text span { font-size: 0.68rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
 
@@ -96,14 +97,21 @@
     border: 1px solid var(--teal); padding: 0.3rem 0.6rem; border-radius: 20px;
   }
 
-  .theme-toggle {
+  .user-pill {
+    font-family: var(--font-ui); font-size: 0.72rem; font-weight: 600;
+    color: var(--ink); background: var(--surface-2); border: 1px solid var(--border);
+    padding: 0.35rem 0.7rem; border-radius: 20px; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .user-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+
+  .theme-toggle, .icon-btn {
     width: 38px; height: 38px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--surface-2);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; color: var(--ink); transition: background 0.15s;
   }
-  .theme-toggle:hover { background: var(--border); }
-  .theme-toggle svg { width: 18px; height: 18px; }
+  .theme-toggle:hover, .icon-btn:hover { background: var(--border); }
+  .theme-toggle svg, .icon-btn svg { width: 18px; height: 18px; }
   html[data-theme="dark"] .icon-sun { display: block; }
   html[data-theme="dark"] .icon-moon { display: none; }
   html[data-theme="light"] .icon-sun { display: none; }
@@ -144,6 +152,7 @@
     display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   }
   .panel-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .panel-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .panel-body { padding: 1rem; }
 
   /* ============ TABS ============ */
@@ -158,6 +167,14 @@
 
   .filter-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .filter-tabs .tab-btn { flex: none; padding: 0.35rem 0.7rem; }
+
+  .btn-report {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border-strong);
+    font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; transition: filter 0.15s;
+  }
+  .btn-report:hover { filter: brightness(0.96); background: var(--teal-soft); border-color: var(--teal); color: var(--teal); }
 
   /* ============ FORM ELEMENTS ============ */
   .field { margin-bottom: 0.7rem; }
@@ -306,6 +323,35 @@
   .upcoming-bottom { display: flex; justify-content: space-between; font-size: 0.62rem; color: #9BA3AE; margin-top: 0.25rem; }
   .upcoming-bottom .due { color: var(--amber); font-family: var(--font-mono); }
 
+  /* ============ LOGIN SCREEN ============ */
+  .login-shell {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem; background:
+      radial-gradient(circle at 20% 20%, var(--teal-soft), transparent 55%),
+      radial-gradient(circle at 80% 80%, var(--amber-soft), transparent 55%),
+      var(--bg);
+  }
+  .login-card {
+    width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 2rem 1.85rem 1.75rem;
+  }
+  .login-logo-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 1.4rem; }
+  .login-logo {
+    width: 64px; height: 64px; border-radius: 14px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--teal); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 22px;
+    box-shadow: var(--shadow); margin-bottom: 0.85rem; padding: 8px;
+  }
+  .login-logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+  .login-title { font-size: 1.02rem; font-weight: 700; text-align: center; }
+  .login-subtitle { font-size: 0.72rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.15rem; text-align: center; }
+  .login-error {
+    background: var(--rust-soft); color: var(--rust); border: 1px solid var(--rust);
+    font-size: 0.72rem; font-weight: 600; padding: 0.55rem 0.7rem; border-radius: 6px; margin-bottom: 0.85rem;
+    text-align: center;
+  }
+  .login-footnote { text-align: center; font-size: 0.65rem; color: var(--ink-soft); margin-top: 1rem; }
+
   /* ============ RESPONSIVE ============ */
   @media (max-width: 1150px) {
     .main-grid { grid-template-columns: 1fr; }
@@ -332,13 +378,52 @@
   <script>
     // ⚠️ PASTE YOUR COPIED GOOGLE DEPLOYMENT LINK HERE:
     const API_URL = "https://script.google.com/macros/s/AKfycbxWOqgjHPh7Yeuxj1vRKOTbnGJjAB0WRP4Ctcw5boTZHh5IfaCID8YnT8bvLZPGLvjK/exec";
+
+    // ⚠️ LOGO: place a "logo.png" file inside your Apps Script project's
+    // /mnt (or upload it to Google Drive) and put a reachable image URL
+    // or a base64 data-URI here. Apps Script web apps cannot serve a
+    // plain "logo.png" from a relative "root" path the way a normal web
+    // server can, so one of these two is required:
+    //   1) Upload logo.png to Drive, share "Anyone with link", then set:
+    //      LOGO_SRC = "https://drive.google.com/thumbnail?id=YOUR_FILE_ID&sz=w200";
+    //   2) Convert logo.png to base64 and set:
+    //      LOGO_SRC = "data:image/png;base64,....";
+    // Leave it as an empty string to fall back to the "SC" text mark.
+    const LOGO_SRC = "logo.png";
   </script>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="loginScreen" class="login-shell">
+    <div class="login-card">
+      <div class="login-logo-wrap">
+        <div class="login-logo" id="loginLogoMark">SC</div>
+        <div class="login-title">SAP Computers</div>
+        <div class="login-subtitle">Ledger &amp; Cheque Desk</div>
+      </div>
+      <p id="loginError" class="login-error hidden"></p>
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+        <div class="field">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" required autocomplete="username" class="input">
+        </div>
+        <div class="field" style="margin-bottom: 1.1rem;">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" class="input">
+        </div>
+        <button type="submit" id="btnLogin" class="btn btn-primary btn-block">Sign In</button>
+      </form>
+      <p class="login-footnote">Access is restricted to registered SAP Computers staff.</p>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP (hidden until signed in) ============ -->
+  <div id="appRoot" class="hidden">
 
   <!-- TOP HEADER -->
   <div class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <div class="brand-mark">SC</div>
+        <div class="brand-mark" id="brandLogoMark">SC</div>
         <div class="brand-text">
           <h1>SAP Computers</h1>
           <span>Ledger &amp; Cheque Desk</span>
@@ -346,6 +431,10 @@
       </div>
       <div class="topbar-right">
         <span id="connStatus" class="status-pill">Local API Node</span>
+        <span id="userPill" class="user-pill hidden"><span class="dot"></span><span id="userPillName">—</span></span>
+        <button class="icon-btn" id="logoutBtn" onclick="handleLogout()" aria-label="Sign out" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
         <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
           <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
@@ -504,11 +593,16 @@
       <div class="panel">
         <div class="panel-header" style="flex-wrap: wrap;">
           <span class="panel-title">Purchasing Log</span>
-          <div class="filter-tabs">
-            <button class="tab-btn" id="btnF_All" onclick="setLedgerFilter('All')">All</button>
-            <button class="tab-btn active" id="btnF_Credit" onclick="setLedgerFilter('Credit Owed')">Credit Owed</button>
-            <button class="tab-btn" id="btnF_Cheque" onclick="setLedgerFilter('Uncleared Cheque')">Cheques</button>
-            <button class="tab-btn" id="btnF_Cleared" onclick="setLedgerFilter('Cleared')">Cleared</button>
+          <div class="panel-header-actions">
+            <div class="filter-tabs">
+              <button class="tab-btn" id="btnF_All" onclick="setLedgerFilter('All')">All</button>
+              <button class="tab-btn active" id="btnF_Credit" onclick="setLedgerFilter('Credit Owed')">Credit Owed</button>
+              <button class="tab-btn" id="btnF_Cheque" onclick="setLedgerFilter('Uncleared Cheque')">Cheques</button>
+              <button class="tab-btn" id="btnF_Cleared" onclick="setLedgerFilter('Cleared')">Cleared</button>
+            </div>
+            <button type="button" class="btn-report" id="btnGenerateReport" onclick="generateReport()" title="Generate a printable report of the currently filtered rows">
+              🖨️ Report
+            </button>
           </div>
         </div>
         <div class="panel-body">
@@ -571,24 +665,111 @@
     </div>
   </div>
 
+  </div><!-- /#appRoot -->
+
   <!-- COMPLETE RUNTIME CONTROLLER JS -->
   <script>
     let cachedLedgerList = [];
     let cachedChequeMasterList = [];
     let cachedSupplierList = [];
     let currentFilterTab = 'Credit Owed';
+    let currentUser = null; // { username, displayName }
+
+    const SESSION_KEY = 'sap_ledger_session';
 
     window.addEventListener('DOMContentLoaded', () => {
       const savedTheme = localStorage.getItem('sap_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       document.documentElement.setAttribute('data-theme', savedTheme);
 
+      applyLogo();
+
       const todayStr = new Date().toISOString().split('T')[0];
       if (document.getElementById('txBillDate')) document.getElementById('txBillDate').value = todayStr;
       if (document.getElementById('chequeTargetDateInput')) document.getElementById('chequeTargetDateInput').value = todayStr;
 
+      restoreSession();
+    });
+
+    // ---------- LOGO ----------
+    function applyLogo() {
+      if (!LOGO_SRC) return; // keep the "SC" text mark fallback
+      [document.getElementById('loginLogoMark'), document.getElementById('brandLogoMark')].forEach(el => {
+        if (!el) return;
+        const img = document.createElement('img');
+        img.src = LOGO_SRC;
+        img.alt = 'SAP Computers logo';
+        img.onerror = () => { el.textContent = 'SC'; }; // fall back if logo.png isn't reachable
+        el.innerHTML = '';
+        el.appendChild(img);
+      });
+    }
+
+    // ---------- LOGIN / SESSION ----------
+    function restoreSession() {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { saved = null; }
+
+      if (saved && saved.username) {
+        currentUser = saved;
+        showApp();
+      } else {
+        showLogin();
+      }
+    }
+
+    function showLogin() {
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('appRoot').classList.add('hidden');
+      setTimeout(() => document.getElementById('loginUsername').focus(), 50);
+    }
+
+    function showApp() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('appRoot').classList.remove('hidden');
+
+      const pill = document.getElementById('userPill');
+      if (currentUser) {
+        pill.classList.remove('hidden');
+        document.getElementById('userPillName').textContent = currentUser.displayName || currentUser.username;
+      }
+
       loadDropdownSuppliers();
       reloadSystemData();
-    });
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('loginError');
+      errBox.classList.add('hidden');
+
+      if (!username || !password) return;
+
+      setButtonLoading('btnLogin', true, 'Signing In...', 'Sign In');
+
+      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username, password } }) })
+        .then(res => {
+          if (!res.success) {
+            errBox.textContent = '⚠ ' + res.message;
+            errBox.classList.remove('hidden');
+            return;
+          }
+          currentUser = { username: res.username, displayName: res.displayName };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+          document.getElementById('loginForm').reset();
+          showApp();
+        })
+        .catch(() => {})
+        .finally(() => setButtonLoading('btnLogin', false, 'Signing In...', 'Sign In'));
+    }
+
+    function handleLogout() {
+      if (!confirm('Sign out of the ledger desk?')) return;
+      currentUser = null;
+      localStorage.removeItem(SESSION_KEY);
+      showLogin();
+    }
 
     function toggleTheme() {
       const current = document.documentElement.getAttribute('data-theme');
@@ -912,6 +1093,8 @@
       renderUpcomingList(filtered, true);
     }
 
+    let lastFilteredRows = []; // kept in sync so the report button can reuse exactly what's on screen
+
     function filterLedgerData() {
       const search = document.getElementById('ledgerSearchInput').value.toLowerCase().trim();
       const container = document.getElementById('ledgerListContainer');
@@ -939,6 +1122,8 @@
                                chqNumberString.includes(search);
         return matchesTab && matchesSearch;
       });
+
+      lastFilteredRows = filteredRows;
 
       filteredRows.forEach(item => {
         filteredCount++;
@@ -998,6 +1183,132 @@
             </div>
           </div>`;
       });
+    }
+
+    // ---------- REPORT GENERATION ----------
+    // Builds a clean, printable report from exactly what's currently on
+    // screen (respects the active filter tab + search term) and opens it
+    // in a new tab, ready to print or save as PDF via the browser dialog.
+    function generateReport() {
+      if (!lastFilteredRows || lastFilteredRows.length === 0) {
+        showError('There is nothing to report on for the current filter.');
+        return;
+      }
+
+      const search = document.getElementById('ledgerSearchInput').value.trim();
+      const tabLabel = search ? 'All (search: "' + search + '")' : currentFilterTab;
+      const now = new Date();
+      const generatedAt = now.toLocaleString();
+
+      let totalBilled = 0, totalPaid = 0, totalBalance = 0;
+      lastFilteredRows.forEach(r => {
+        totalBilled += r.totalAmount;
+        totalPaid += r.amountPaid;
+        totalBalance += r.balance;
+      });
+
+      const rowsHtml = lastFilteredRows.map(item => `
+        <tr>
+          <td>${escapeHtml(item.supplierName)}</td>
+          <td>${escapeHtml(item.billNumber)}</td>
+          <td>${item.billDate}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td class="num">${item.totalAmount.toFixed(2)}</td>
+          <td class="num">${item.amountPaid.toFixed(2)}</td>
+          <td class="num">${item.balance.toFixed(2)}</td>
+          <td>${escapeHtml(item.status)}</td>
+          <td>${escapeHtml(item.chequeNumber || '—')}</td>
+        </tr>`).join('');
+
+      const reportWindow = window.open('', '_blank');
+      if (!reportWindow) {
+        showError('Your browser blocked the report popup. Please allow popups for this site and try again.');
+        return;
+      }
+
+      reportWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>SAP Computers — Ledger Report — ${generatedAt}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: 'IBM Plex Sans', Arial, sans-serif; margin: 2rem; color: #1C2B24; }
+            .rpt-header { display: flex; align-items: center; gap: 0.9rem; border-bottom: 3px solid #0F6E5E; padding-bottom: 1rem; margin-bottom: 1.2rem; }
+            .rpt-logo { width: 46px; height: 46px; border-radius: 10px; background: #0F6E5E; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: monospace; font-size: 18px; overflow: hidden; padding: 5px; }
+            .rpt-logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+            .rpt-title { font-size: 1.25rem; font-weight: 700; margin: 0; }
+            .rpt-subtitle { font-size: 0.8rem; color: #5B6760; margin: 0.15rem 0 0; }
+            .rpt-meta { font-size: 0.75rem; color: #5B6760; margin-bottom: 1.2rem; }
+            .rpt-meta strong { color: #1C2B24; }
+            .rpt-summary { display: flex; gap: 1rem; margin-bottom: 1.4rem; flex-wrap: wrap; }
+            .rpt-summary div { border: 1px solid #DCD8CC; border-radius: 8px; padding: 0.6rem 0.9rem; min-width: 140px; }
+            .rpt-summary .lbl { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5B6760; }
+            .rpt-summary .val { font-family: monospace; font-size: 1.1rem; font-weight: 700; margin-top: 0.2rem; }
+            table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+            th, td { border: 1px solid #DCD8CC; padding: 0.4rem 0.5rem; text-align: left; }
+            th { background: #F6F5F1; text-transform: uppercase; font-size: 0.62rem; letter-spacing: 0.04em; color: #5B6760; }
+            td.num, th.num { text-align: right; font-family: monospace; }
+            tfoot td { font-weight: 700; background: #FBFAF7; }
+            .rpt-footer { margin-top: 1.5rem; font-size: 0.65rem; color: #5B6760; text-align: center; }
+            @media print { .no-print { display: none; } body { margin: 0.6in; } }
+            .no-print { margin-bottom: 1.2rem; }
+            .print-btn { background: #0F6E5E; color: #fff; border: none; padding: 0.55rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print"><button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button></div>
+          <div class="rpt-header">
+            <div class="rpt-logo" id="rptLogo">SC</div>
+            <div>
+              <p class="rpt-title">SAP Computers</p>
+              <p class="rpt-subtitle">Ledger &amp; Cheque Desk — Purchasing Report</p>
+            </div>
+          </div>
+          <p class="rpt-meta">Filter: <strong>${escapeHtml(tabLabel)}</strong> &nbsp;|&nbsp; Generated: <strong>${generatedAt}</strong>${currentUser ? ' &nbsp;|&nbsp; By: <strong>' + escapeHtml(currentUser.displayName || currentUser.username) + '</strong>' : ''}</p>
+          <div class="rpt-summary">
+            <div><div class="lbl">Invoices</div><div class="val">${lastFilteredRows.length}</div></div>
+            <div><div class="lbl">Total Billed</div><div class="val">${totalBilled.toFixed(2)}</div></div>
+            <div><div class="lbl">Total Paid</div><div class="val">${totalPaid.toFixed(2)}</div></div>
+            <div><div class="lbl">Balance Owed</div><div class="val">${totalBalance.toFixed(2)}</div></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Supplier</th><th>Bill Ref</th><th>Date</th><th>Description</th>
+                <th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th>
+                <th>Status</th><th>Cheque #</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4">Totals</td>
+                <td class="num">${totalBilled.toFixed(2)}</td>
+                <td class="num">${totalPaid.toFixed(2)}</td>
+                <td class="num">${totalBalance.toFixed(2)}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+          <p class="rpt-footer">SAP Computers — Ledger &amp; Cheque Desk — Generated automatically from live ledger data.</p>
+          <script>
+            (function() {
+              var logoSrc = ${JSON.stringify(LOGO_SRC || '')};
+              if (!logoSrc) return;
+              var el = document.getElementById('rptLogo');
+              var img = document.createElement('img');
+              img.src = logoSrc;
+              img.onerror = function() { el.textContent = 'SC'; };
+              el.innerHTML = '';
+              el.appendChild(img);
+            })();
+          <\/script>
+        </body>
+        </html>
+      `);
+      reportWindow.document.close();
     }
 
     // ---------- ROW ACTIONS: DELETE / MARK CLEARED ----------
