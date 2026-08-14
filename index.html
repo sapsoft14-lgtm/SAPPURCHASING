@@ -377,22 +377,38 @@
   .cal-day.is-selected { box-shadow: inset 0 0 0 2px var(--rust); }
   .cal-day-num { font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; color: var(--ink-soft); }
   .cal-day.has-cheques .cal-day-num { color: var(--amber); }
-  .cal-day-amt { font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; color: var(--amber); margin-top: auto; line-height: 1.2; }
+  .cal-day-amt { font-family: var(--font-mono); font-size: 0.63rem; font-weight: 700; margin-top: auto; line-height: 1.25; }
+  .cal-day-amt.pending { color: var(--amber); }
+  .cal-day-amt.cleared { color: var(--teal); }
   .cal-day-count { font-size: 0.56rem; color: var(--ink-soft); }
+
+  .cal-day.has-cleared-only { border-color: var(--teal); background: var(--teal-soft); }
+  .cal-day.has-cleared-only .cal-day-num { color: var(--teal); }
+
+  .cal-legend { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .cal-legend-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.62rem; color: var(--ink-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .cal-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .cal-legend-swatch.pending { background: var(--amber); }
+  .cal-legend-swatch.cleared { background: var(--teal); }
 
   .cal-month-summary { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
   .cal-month-summary .stat-card { flex: 1; min-width: 140px; padding: 0.65rem 0.8rem; }
 
   .cal-day-detail { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.85rem; }
   .cal-day-detail-title { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 0.5rem; }
-  .cal-day-detail-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 220px; overflow-y: auto; }
+  .cal-day-detail-group-label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; margin: 0.5rem 0 0.3rem; }
+  .cal-day-detail-group-label.pending { color: var(--amber); }
+  .cal-day-detail-group-label.cleared { color: var(--teal); }
+  .cal-day-detail-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 260px; overflow-y: auto; }
   .cal-day-detail-chip {
     background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 5px;
     padding: 0.4rem 0.55rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem;
   }
+  .cal-day-detail-chip.cleared { background: var(--teal-soft); border-color: var(--teal); }
   .cal-day-detail-chip .chip-supplier { font-weight: 600; color: var(--ink); }
   .cal-day-detail-chip .chip-num { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-soft); display: block; }
   .cal-day-detail-chip .chip-amt { font-family: var(--font-mono); font-weight: 700; color: var(--amber); }
+  .cal-day-detail-chip.cleared .chip-amt { color: var(--teal); }
 
   .intel-cal-btn {
     display: flex; align-items: center; justify-content: center; gap: 0.35rem; margin: 0.6rem auto 0; width: 100%;
@@ -805,6 +821,10 @@
           </span>
           <button type="button" class="cal-nav-btn" onclick="shiftCalendarMonth(1)" aria-label="Next month">›</button>
         </div>
+        <div class="cal-legend">
+          <span class="cal-legend-item"><span class="cal-legend-swatch pending"></span>Pending / Due</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch cleared"></span>Cleared</span>
+        </div>
         <div class="cal-grid" id="calDowRow"></div>
         <div class="cal-grid" id="calGridBody" style="margin-top:4px;"></div>
 
@@ -840,6 +860,14 @@
     let cachedUsersList = [];
     let calendarViewDate = new Date();
     let calendarSelectedDate = null;
+
+    // Remembers { dueDate, chequeNum, supplier, amount } per purchase id, captured
+    // while a cheque is still pending. This is the only place a cheque's due date
+    // survives after it gets cleared (the API only returns due dates for pending
+    // cheques), so the calendar can keep plotting cleared cheques on the day they
+    // were due. Only covers cheques seen since this page was opened.
+    let chequeDueDateHistory = {};
+    let autoClearAttempted = new Set(); // purchase ids we've already tried to auto-clear, this session
 
     const SESSION_KEY = 'sap_ledger_session';
 
@@ -1154,19 +1182,25 @@
     }
 
     function reloadSystemData() {
-      safeFetchJSON(`${API_URL}?action=getPurchasesList`)
-        .then(list => {
-          cachedLedgerList = list;
+      // Fetch both lists together (rather than as two independent chains) so that
+      // by the time we process cheques, cachedLedgerList is already up to date —
+      // that's what lets updateChequeDueDateHistory() and autoClearOverdueCheques()
+      // correlate a cheque # to a purchase id.
+      Promise.all([
+        safeFetchJSON(`${API_URL}?action=getPurchasesList`).catch(() => null),
+        safeFetchJSON(`${API_URL}?action=getUpcomingCheques`).catch(() => null)
+      ]).then(([purchases, cheques]) => {
+        if (purchases) {
+          cachedLedgerList = purchases;
           filterLedgerData();
-        })
-        .catch(() => {
+        } else {
           document.getElementById('ledgerListContainer').innerHTML =
             '<p class="empty-state">Failed to load ledger data. Check your connection and try again.</p>';
-        });
+        }
 
-      safeFetchJSON(`${API_URL}?action=getUpcomingCheques`)
-        .then(cheques => {
+        if (cheques) {
           cachedChequeMasterList = cheques;
+          updateChequeDueDateHistory();
 
           // Route through the search filter so any cheque # already typed
           // stays applied to the Upcoming Pending Outlays list on reload.
@@ -1178,11 +1212,61 @@
           // Keep the calendar modal's numbers fresh if it happens to be open.
           const overlay = document.getElementById('calendarModalOverlay');
           if (overlay && !overlay.classList.contains('hidden')) renderCalendarMonth();
-        })
-        .catch(() => {
+
+          if (purchases) autoClearOverdueCheques();
+        } else {
           document.getElementById('containerUpcoming').innerHTML =
             '<p class="intel-metric-empty">Failed to load cheque data.</p>';
+        }
+      });
+    }
+
+    // Keeps a running memory of each pending cheque's due date, keyed by the
+    // purchase it's linked to (matched via cheque number), so that info isn't
+    // lost the moment a cheque clears and drops out of getUpcomingCheques.
+    function updateChequeDueDateHistory() {
+      cachedChequeMasterList.forEach(c => {
+        const match = cachedLedgerList.find(item => String(item.chequeNumber) === String(c.chequeNum));
+        if (match) {
+          chequeDueDateHistory[match.id] = {
+            dueDate: c.dueDate,
+            chequeNum: c.chequeNum,
+            supplier: c.supplier,
+            amount: c.amount
+          };
+        }
+      });
+    }
+
+    // Any bill still sitting in "Uncleared Cheque" whose cheque due date has
+    // already passed gets automatically marked cleared — no manual click needed.
+    function autoClearOverdueCheques() {
+      const todayStr = new Date().toLocaleDateString('sv-SE');
+
+      const overdue = cachedLedgerList
+        .filter(item => item.status === 'Uncleared Cheque' && !autoClearAttempted.has(item.id))
+        .map(item => {
+          const hist = chequeDueDateHistory[item.id];
+          const fallback = cachedChequeMasterList.find(c => String(c.chequeNum) === String(item.chequeNumber));
+          const dueDate = hist ? hist.dueDate : (fallback ? fallback.dueDate : null);
+          return { id: item.id, dueDate };
+        })
+        .filter(x => x.dueDate && x.dueDate < todayStr);
+
+      if (overdue.length === 0) return;
+
+      overdue.forEach(x => autoClearAttempted.add(x.id));
+
+      Promise.all(overdue.map(x => performMarkChequeCleared(x.id).catch(() => null)))
+        .then(results => {
+          if (results.some(r => r && r.success)) reloadSystemData();
         });
+    }
+
+    // Shared with the manual "Mark Cleared" button — the confirm() dialog
+    // lives with the caller, not here, so this can run silently in the background.
+    function performMarkChequeCleared(purchaseId) {
+      return safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markChequeCleared', data: { purchaseId } }) });
     }
 
     // ---------- UPCOMING PENDING OUTLAYS: RENDER + FILTER ----------
@@ -1320,17 +1404,34 @@
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       document.getElementById('calMonthLabel').innerText = monthNames[month] + ' ' + year;
 
+      // totalsByDate[dateStr] = { pending: {sum, count}, cleared: {sum, count} }
       const totalsByDate = {};
+      const ensureDate = (dateStr) => {
+        if (!totalsByDate[dateStr]) totalsByDate[dateStr] = { pending: { sum: 0, count: 0 }, cleared: { sum: 0, count: 0 } };
+        return totalsByDate[dateStr];
+      };
+      const inThisMonth = (dateStr) => {
+        const parts = String(dateStr).split('-');
+        if (parts.length !== 3) return false;
+        return parseInt(parts[0], 10) === year && (parseInt(parts[1], 10) - 1) === month;
+      };
+
+      // Pending / still-due cheques.
       cachedChequeMasterList.forEach(c => {
-        if (!c.dueDate) return;
-        const parts = String(c.dueDate).split('-');
-        if (parts.length !== 3) return;
-        const cy = parseInt(parts[0], 10), cm = parseInt(parts[1], 10) - 1;
-        if (cy === year && cm === month) {
-          if (!totalsByDate[c.dueDate]) totalsByDate[c.dueDate] = { sum: 0, count: 0 };
-          totalsByDate[c.dueDate].sum += c.amount;
-          totalsByDate[c.dueDate].count += 1;
-        }
+        if (!c.dueDate || !inThisMonth(c.dueDate)) return;
+        const bucket = ensureDate(c.dueDate).pending;
+        bucket.sum += c.amount;
+        bucket.count += 1;
+      });
+
+      // Cleared cheques — only ones this session has a remembered due date for.
+      cachedLedgerList.forEach(item => {
+        if (item.status !== 'Cleared' || !item.chequeNumber) return;
+        const hist = chequeDueDateHistory[item.id];
+        if (!hist || !hist.dueDate || !inThisMonth(hist.dueDate)) return;
+        const bucket = ensureDate(hist.dueDate).cleared;
+        bucket.sum += hist.amount;
+        bucket.count += 1;
       });
 
       const firstOfMonth = new Date(year, month, 1);
@@ -1343,7 +1444,7 @@
         cellsHtml += '<div class="cal-day empty"></div>';
       }
 
-      let monthTotal = 0;
+      let monthTotalPending = 0;
       let daysWithCheques = 0;
 
       for (let day = 1; day <= daysInMonth; day++) {
@@ -1351,23 +1452,31 @@
         const dd = String(day).padStart(2, '0');
         const dateStr = `${year}-${mm}-${dd}`;
         const info = totalsByDate[dateStr];
-        const hasCheques = !!info;
-        if (hasCheques) { monthTotal += info.sum; daysWithCheques++; }
+        const hasPending = !!(info && info.pending.count);
+        const hasCleared = !!(info && info.cleared.count);
+        const hasAny = hasPending || hasCleared;
+        if (hasPending) { monthTotalPending += info.pending.sum; }
+        if (hasAny) daysWithCheques++;
 
         const classes = ['cal-day'];
-        if (hasCheques) classes.push('has-cheques');
+        if (hasPending) classes.push('has-cheques');
+        else if (hasCleared) classes.push('has-cleared-only');
         if (dateStr === todayStr) classes.push('is-today');
         if (dateStr === calendarSelectedDate) classes.push('is-selected');
 
+        const countTotal = (hasPending ? info.pending.count : 0) + (hasCleared ? info.cleared.count : 0);
+
         cellsHtml += `
-          <div class="${classes.join(' ')}" ${hasCheques ? `onclick="showCalendarDayDetail('${dateStr}')"` : ''}>
+          <div class="${classes.join(' ')}" ${hasAny ? `onclick="showCalendarDayDetail('${dateStr}')"` : ''}>
             <span class="cal-day-num">${day}</span>
-            ${hasCheques ? `<span class="cal-day-amt">${info.sum.toFixed(2)}</span><span class="cal-day-count">${info.count} chq${info.count > 1 ? 's' : ''}</span>` : ''}
+            ${hasPending ? `<span class="cal-day-amt pending">${info.pending.sum.toFixed(2)}</span>` : ''}
+            ${hasCleared ? `<span class="cal-day-amt cleared">✓ ${info.cleared.sum.toFixed(2)}</span>` : ''}
+            ${hasAny ? `<span class="cal-day-count">${countTotal} chq${countTotal > 1 ? 's' : ''}</span>` : ''}
           </div>`;
       }
 
       document.getElementById('calGridBody').innerHTML = cellsHtml;
-      document.getElementById('calMonthTotal').innerText = monthTotal.toFixed(2);
+      document.getElementById('calMonthTotal').innerText = monthTotalPending.toFixed(2);
       document.getElementById('calMonthDaysCount').innerText = daysWithCheques;
 
       // Keep the day-detail panel in sync if a day in this month is still selected.
@@ -1383,21 +1492,42 @@
       calendarSelectedDate = dateStr;
       if (!skipRerender) renderCalendarMonth();
 
-      const items = cachedChequeMasterList.filter(c => c.dueDate === dateStr);
+      const pendingItems = cachedChequeMasterList.filter(c => c.dueDate === dateStr);
+      const clearedItems = cachedLedgerList
+        .filter(item => item.status === 'Cleared' && item.chequeNumber)
+        .map(item => ({ item, hist: chequeDueDateHistory[item.id] }))
+        .filter(({ hist }) => hist && hist.dueDate === dateStr);
+
       const detail = document.getElementById('calDayDetail');
       const title = document.getElementById('calDayDetailTitle');
       const list = document.getElementById('calDayDetailList');
 
       const d = new Date(dateStr + 'T00:00:00');
       const label = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      title.innerText = `Cheques Due — ${label}`;
+      title.innerText = `Cheques — ${label}`;
 
-      list.innerHTML = items.map(item => `
-        <div class="cal-day-detail-chip">
-          <div><span class="chip-supplier">${escapeHtml(item.supplier)}</span><span class="chip-num">Chq: ${escapeHtml(String(item.chequeNum))}</span></div>
-          <div class="chip-amt">${item.amount.toFixed(2)}</div>
-        </div>`).join('');
+      let html = '';
+      if (pendingItems.length > 0) {
+        html += `<div class="cal-day-detail-group-label pending">Pending / Due</div>`;
+        html += pendingItems.map(item => `
+          <div class="cal-day-detail-chip">
+            <div><span class="chip-supplier">${escapeHtml(item.supplier)}</span><span class="chip-num">Chq: ${escapeHtml(String(item.chequeNum))}</span></div>
+            <div class="chip-amt">${item.amount.toFixed(2)}</div>
+          </div>`).join('');
+      }
+      if (clearedItems.length > 0) {
+        html += `<div class="cal-day-detail-group-label cleared">Cleared</div>`;
+        html += clearedItems.map(({ item, hist }) => `
+          <div class="cal-day-detail-chip cleared">
+            <div><span class="chip-supplier">${escapeHtml(item.supplierName)}</span><span class="chip-num">Chq: ${escapeHtml(String(hist.chequeNum))}</span></div>
+            <div class="chip-amt">${hist.amount.toFixed(2)}</div>
+          </div>`).join('');
+      }
+      if (!html) {
+        html = '<p class="intel-metric-empty" style="color: var(--ink-soft);">No cheque activity on this day.</p>';
+      }
 
+      list.innerHTML = html;
       detail.classList.remove('hidden');
     }
 
@@ -1634,7 +1764,8 @@
     function handleMarkChequeCleared(purchaseId) {
       if (!confirm('Mark the pending cheque(s) on this bill as cleared?')) return;
 
-      safeFetchJSON(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markChequeCleared', data: { purchaseId } }) })
+      autoClearAttempted.add(purchaseId); // manual clear also counts, skip re-checking it automatically
+      performMarkChequeCleared(purchaseId)
         .then(res => {
           if (!res.success) { showError(res.message); return; }
           reloadSystemData();
