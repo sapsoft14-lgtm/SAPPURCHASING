@@ -467,6 +467,36 @@
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
+  /* ============ CHEQUE PRINT VIEW ============ */
+  .view-switch { min-width: 250px; }
+  .view-switch .tab-btn { padding: 0.45rem 0.9rem; white-space: nowrap; }
+  .cp-grid { display: grid; grid-template-columns: 340px 1fr; gap: 1.25rem; align-items: start; }
+  .cp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.9rem; }
+  .cp-actions .btn-primary { grid-column: 1 / -1; padding: 0.7rem; font-size: 0.85rem; }
+  .cp-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.55rem; cursor: pointer; }
+  .cp-check input { accent-color: var(--teal); width: 15px; height: 15px; }
+  .cp-words { resize: vertical; min-height: 64px; font-family: var(--font-ui); }
+  .cp-link-btn { background: none; border: none; color: var(--teal); font-size: 0.68rem; font-weight: 700; cursor: pointer; padding: 0; text-transform: uppercase; letter-spacing: 0.03em; }
+  .cp-preview-wrap { background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: 8px; padding: 0.9rem; overflow-x: auto; }
+  .cp-sheet { position: relative; background: #FFFEF8; border: 1px solid var(--border-strong); box-shadow: var(--shadow); overflow: hidden; color: #111; margin: 0 auto; }
+  .cp-shift { position: absolute; }
+  .cp-el { position: absolute; white-space: nowrap; font-family: Arial, Helvetica, sans-serif; color: #111; line-height: 1; overflow: hidden; }
+  .cp-el.wrap { white-space: normal; overflow: visible; }
+  .cp-cross { position: absolute; border-top: 0.35px solid #111; border-bottom: 0.35px solid #111; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 700; color: #111; transform-origin: left top; display: flex; align-items: center; justify-content: center; }
+  .cp-ghost { position: absolute; border: 1px dashed rgba(15,110,94,0.45); color: rgba(15,110,94,0.7); font: 600 9px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; pointer-events: none; padding: 1px 3px; overflow: hidden; }
+  .cp-hint { font-size: 0.68rem; color: var(--ink-soft); margin: 0.6rem 0 0; line-height: 1.5; }
+  .cp-lay-head { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin: 0.9rem 0 0.4rem; }
+  .cp-lay-row { display: grid; grid-template-columns: 92px repeat(3, 1fr); gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; }
+  .cp-lay-row .lbl { font-size: 0.7rem; font-weight: 600; }
+  .cp-lay-row .input { padding: 0.35rem 0.45rem; font-size: 0.75rem; }
+  .cp-lay-cap { font-size: 0.58rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; text-align: center; }
+  details.cp-details > summary { cursor: pointer; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); padding: 0.8rem 1rem; list-style: none; }
+  details.cp-details > summary::-webkit-details-marker { display: none; }
+  details.cp-details > summary::before { content: '▸ '; }
+  details.cp-details[open] > summary::before { content: '▾ '; }
+  details.cp-details[open] > summary { border-bottom: 1px solid var(--border); }
+  @media (max-width: 1150px) { .cp-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .view-switch { min-width: 0; } .view-switch .tab-btn { padding: 0.4rem 0.55rem; font-size: 0.65rem; } }
 </style>
 </head>
 <body>
@@ -525,6 +555,10 @@
           <span>Ledger &amp; Cheque Desk</span>
         </div>
       </div>
+      <div class="tabs view-switch" role="tablist">
+        <button type="button" class="tab-btn active" id="viewBtn_ledger" onclick="switchView('ledger')">📒 Ledger</button>
+        <button type="button" class="tab-btn" id="viewBtn_cheque" onclick="switchView('cheque')">🖨️ Cheque Print</button>
+      </div>
       <div class="topbar-right">
         <span id="connStatus" class="status-pill">Local API Node</span>
         <span id="userPill" class="user-pill hidden"><span class="dot"></span><span id="userPillName">—</span></span>
@@ -541,7 +575,7 @@
 
   <div id="errorBanner" class="error-banner hidden"></div>
 
-  <div class="shell">
+  <div class="shell" id="ledgerView">
 
     <!-- STAT STRIP -->
     <div class="stat-strip">
@@ -799,6 +833,75 @@
               <p class="intel-metric-empty">Checking active bank outlays...</p>
             </div>
           </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ CHEQUE PRINT VIEW ============ -->
+  <div class="shell hidden" id="chequePrintView">
+    <div class="cp-grid">
+
+      <!-- LEFT: CHEQUE DETAILS -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Cheque Details</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="cpPending">Quick fill from pending cheque (optional)</label>
+            <select id="cpPending" class="input" onchange="cpFillFromPending(this.value)">
+              <option value="">— Type details manually —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cpPayee">Pay To (Payee)</label>
+            <input type="text" id="cpPayee" class="input" list="cpSupplierDatalist" autocomplete="off" oninput="cpRender()">
+            <datalist id="cpSupplierDatalist"></datalist>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="cpAmount">Amount (Rs.)</label>
+              <input type="number" id="cpAmount" class="input mono-input" step="0.01" min="0" oninput="cpOnAmountInput()">
+            </div>
+            <div class="field">
+              <label for="cpDate">Cheque Date</label>
+              <input type="date" id="cpDate" class="input mono-input" oninput="cpRender()">
+            </div>
+          </div>
+          <div class="field">
+            <label for="cpWords" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Amount in Words</span>
+              <button type="button" class="cp-link-btn" onclick="cpResetWords()">↺ Auto</button>
+            </label>
+            <textarea id="cpWords" class="input cp-words" oninput="cpWordsManual = true; cpRender()"></textarea>
+          </div>
+          <label class="cp-check"><input type="checkbox" id="cpCross" checked onchange="cpRender()"> Cross cheque — “A/C Payee Only”</label>
+
+          <div class="cp-actions">
+            <button type="button" class="btn btn-primary" onclick="cpPrint(false)">🖨️ Print Cheque</button>
+            <button type="button" class="btn btn-secondary" onclick="cpPrint(true)" title="Prints sample text with guide boxes so you can check alignment on plain paper">Print Test Sheet</button>
+            <button type="button" class="btn btn-secondary" onclick="cpClearForm()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: PREVIEW + LAYOUT -->
+      <div style="display:flex; flex-direction:column; gap:1.25rem; min-width:0;">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Live Preview</span><span class="panel-title" id="cpSizeLabel" style="font-family:var(--font-mono);"></span></div>
+          <div class="panel-body">
+            <div class="cp-preview-wrap" id="cpPreviewWrap">
+              <div class="cp-sheet" id="cpSheet"></div>
+            </div>
+            <p class="cp-hint">Only the filled-in text is printed — load your pre-printed cheque leaf into the printer. Dashed green boxes are guides and never print on a real cheque. Run a <strong>Test Sheet</strong> on plain paper, hold it against a cheque leaf, then adjust positions below until they match.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <details class="cp-details" id="cpLayoutDetails">
+            <summary>Printer &amp; Cheque Layout (mm)</summary>
+            <div class="panel-body" id="cpLayoutBody"></div>
+          </details>
         </div>
       </div>
 
@@ -2067,6 +2170,339 @@
           loadUsersList();
         })
         .catch(() => {});
+    }
+
+    // ---------- CHEQUE PRINT TOOL ----------
+    const CP_LAYOUT_KEY = 'sap_cheque_layout_v1';
+    const CP_DEFAULTS = {
+      w: 203, h: 89, paper: 'cheque',           // cheque size (mm) and paper: 'cheque' | 'a4'
+      offX: 0, offY: 0,                          // global printer offset (mm)
+      fontPt: 11, lineH: 8, dateSpacing: 3.2,    // text sizing
+      dateStyle: 'boxed',                        // 'boxed' = DDMMYYYY with spacing, 'slash' = DD/MM/YYYY
+      stars: true, upper: false,
+      date:   { x: 152, y: 9 },
+      payee:  { x: 28,  y: 27, w: 128 },
+      words:  { x: 28,  y: 37, w: 128 },
+      amount: { x: 166, y: 46 },
+      cross:  { x: 12,  y: 12 }
+    };
+    let cpLayout = cpLoadLayout();
+    let cpWordsManual = false;
+    let cpBuilt = false;
+
+    function cpLoadLayout() {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(CP_LAYOUT_KEY) || 'null'); } catch (e) { saved = null; }
+      const d = JSON.parse(JSON.stringify(CP_DEFAULTS));
+      if (saved && typeof saved === 'object') {
+        Object.keys(d).forEach(k => {
+          if (d[k] && typeof d[k] === 'object') {
+            if (saved[k] && typeof saved[k] === 'object') Object.assign(d[k], saved[k]);
+          } else if (saved[k] !== undefined) {
+            d[k] = saved[k];
+          }
+        });
+      }
+      return d;
+    }
+    function cpSaveLayout() {
+      try { localStorage.setItem(CP_LAYOUT_KEY, JSON.stringify(cpLayout)); } catch (e) {}
+    }
+
+    function switchView(view) {
+      const isCheque = view === 'cheque';
+      document.getElementById('ledgerView').classList.toggle('hidden', isCheque);
+      document.getElementById('chequePrintView').classList.toggle('hidden', !isCheque);
+      document.getElementById('viewBtn_ledger').classList.toggle('active', !isCheque);
+      document.getElementById('viewBtn_cheque').classList.toggle('active', isCheque);
+      if (isCheque) cpOpen();
+    }
+
+    function cpTodayISO() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function cpOpen() {
+      if (!cpBuilt) { cpBuildLayoutForm(); cpBuilt = true; }
+      const dl = document.getElementById('cpSupplierDatalist');
+      dl.innerHTML = (cachedSupplierList || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
+
+      const sel = document.getElementById('cpPending');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">— Type details manually —</option>' +
+        (cachedChequeMasterList || []).map((c, i) =>
+          `<option value="${i}">${escapeHtml(c.supplier)} — Chq ${escapeHtml(String(c.chequeNum))} — ${Number(c.amount || 0).toFixed(2)}</option>`
+        ).join('');
+      sel.value = keep;
+
+      if (!document.getElementById('cpDate').value) document.getElementById('cpDate').value = cpTodayISO();
+      cpRender();
+    }
+
+    function cpFillFromPending(idx) {
+      if (idx === '') return;
+      const c = (cachedChequeMasterList || [])[Number(idx)];
+      if (!c) return;
+      document.getElementById('cpPayee').value = c.supplier || '';
+      document.getElementById('cpAmount').value = Number(c.amount || 0).toFixed(2);
+      const m = String(c.dueDate || '').match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) {
+        document.getElementById('cpDate').value = m[1];
+      } else if (c.dueDate) {
+        const dt = new Date(c.dueDate);
+        if (!isNaN(dt)) document.getElementById('cpDate').value =
+          dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      }
+      cpWordsManual = false;
+      cpOnAmountInput();
+    }
+
+    function cpOnAmountInput() {
+      if (!cpWordsManual) {
+        const amt = parseFloat(document.getElementById('cpAmount').value);
+        document.getElementById('cpWords').value = cpAmountWords(amt);
+      }
+      cpRender();
+    }
+    function cpResetWords() { cpWordsManual = false; cpOnAmountInput(); }
+
+    function cpClearForm() {
+      document.getElementById('cpPending').value = '';
+      document.getElementById('cpPayee').value = '';
+      document.getElementById('cpAmount').value = '';
+      document.getElementById('cpWords').value = '';
+      document.getElementById('cpDate').value = cpTodayISO();
+      document.getElementById('cpCross').checked = true;
+      cpWordsManual = false;
+      cpRender();
+    }
+
+    // ---------- Amount in words (international grouping: thousand / million / billion) ----------
+    function cpNumWords(n) {
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve',
+        'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const below1000 = x => {
+        let p = [];
+        if (x >= 100) { p.push(ones[Math.floor(x / 100)] + ' Hundred'); x %= 100; }
+        if (x >= 20) { p.push(tens[Math.floor(x / 10)] + (x % 10 ? ' ' + ones[x % 10] : '')); }
+        else if (x > 0) { p.push(ones[x]); }
+        return p.join(' ');
+      };
+      if (n === 0) return 'Zero';
+      const scales = [[1e9, 'Billion'], [1e6, 'Million'], [1e3, 'Thousand']];
+      let out = [];
+      scales.forEach(([val, name]) => {
+        if (n >= val) { out.push(below1000(Math.floor(n / val)) + ' ' + name); n %= val; }
+      });
+      if (n > 0) out.push(below1000(n));
+      return out.join(' ');
+    }
+
+    function cpAmountWords(amount) {
+      if (!isFinite(amount) || amount <= 0) return '';
+      const total = Math.round(amount * 100);
+      const rupees = Math.floor(total / 100);
+      const cents = total % 100;
+      let t = '';
+      if (rupees > 0) t = 'Rupees ' + cpNumWords(rupees);
+      if (cents > 0) t += (rupees > 0 ? ' and ' : '') + 'Cents ' + cpNumWords(cents);
+      return t + ' Only';
+    }
+
+    // ---------- Layout form ----------
+    function cpBuildLayoutForm() {
+      const L = cpLayout;
+      const num = (path, val, step) =>
+        `<input type="number" class="input mono-input" step="${step || 0.5}" value="${val}" oninput="cpSetNum('${path}', this.value)">`;
+      const posRow = (key, label, hasW) => `
+        <div class="cp-lay-row">
+          <span class="lbl">${label}</span>
+          ${num(key + '.x', L[key].x)}${num(key + '.y', L[key].y)}${hasW ? num(key + '.w', L[key].w) : '<span></span>'}
+        </div>`;
+
+      document.getElementById('cpLayoutBody').innerHTML = `
+        <div class="cp-lay-head" style="margin-top:0">Cheque size &amp; printer offset</div>
+        <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Width</span><span class="cp-lay-cap">Height</span><span></span></div>
+        <div class="cp-lay-row"><span class="lbl">Cheque</span>${num('w', L.w)}${num('h', L.h)}<span></span></div>
+        <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Shift →</span><span class="cp-lay-cap">Shift ↓</span><span></span></div>
+        <div class="cp-lay-row"><span class="lbl">Printer offset</span>${num('offX', L.offX, 0.1)}${num('offY', L.offY, 0.1)}<span></span></div>
+        <div class="cp-lay-row">
+          <span class="lbl">Paper</span>
+          <select class="input" style="grid-column: span 3" onchange="cpSetOpt('paper', this.value)">
+            <option value="cheque" ${L.paper === 'cheque' ? 'selected' : ''}>Cheque-size paper (feed the leaf directly)</option>
+            <option value="a4" ${L.paper === 'a4' ? 'selected' : ''}>A4 page (cheque area at top-left)</option>
+          </select>
+        </div>
+
+        <div class="cp-lay-head">Field positions</div>
+        <div class="cp-lay-row"><span></span><span class="cp-lay-cap">From left</span><span class="cp-lay-cap">From top</span><span class="cp-lay-cap">Width</span></div>
+        ${posRow('date', 'Date')}
+        ${posRow('payee', 'Payee', true)}
+        ${posRow('words', 'Amount words', true)}
+        ${posRow('amount', 'Amount (figures)')}
+        ${posRow('cross', 'A/C Payee crossing')}
+
+        <div class="cp-lay-head">Text style</div>
+        <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Font (pt)</span><span class="cp-lay-cap">Words line gap</span><span class="cp-lay-cap">Date spacing</span></div>
+        <div class="cp-lay-row"><span class="lbl">Sizes</span>${num('fontPt', L.fontPt, 0.5)}${num('lineH', L.lineH, 0.5)}${num('dateSpacing', L.dateSpacing, 0.1)}</div>
+        <div class="cp-lay-row">
+          <span class="lbl">Date format</span>
+          <select class="input" style="grid-column: span 3" onchange="cpSetOpt('dateStyle', this.value)">
+            <option value="boxed" ${L.dateStyle === 'boxed' ? 'selected' : ''}>DDMMYYYY — spaced to fit date boxes</option>
+            <option value="slash" ${L.dateStyle === 'slash' ? 'selected' : ''}>DD/MM/YYYY</option>
+          </select>
+        </div>
+        <label class="cp-check" style="margin-top:0.6rem"><input type="checkbox" ${L.stars ? 'checked' : ''} onchange="cpSetOpt('stars', this.checked)"> Add *** padding around amount in words</label>
+        <label class="cp-check"><input type="checkbox" ${L.upper ? 'checked' : ''} onchange="cpSetOpt('upper', this.checked)"> Print amount in words in CAPITALS</label>
+
+        <button type="button" class="btn btn-danger" style="margin-top:0.5rem" onclick="cpResetLayout()">Reset layout to defaults</button>
+        <p class="cp-hint">Settings are saved on this computer/browser, so each branch PC can keep its own printer calibration.</p>`;
+    }
+
+    function cpSetNum(path, raw) {
+      const v = parseFloat(raw);
+      if (!isFinite(v)) return;
+      const parts = path.split('.');
+      if (parts.length === 2) cpLayout[parts[0]][parts[1]] = v; else cpLayout[parts[0]] = v;
+      cpSaveLayout(); cpRender();
+    }
+    function cpSetOpt(key, val) { cpLayout[key] = val; cpSaveLayout(); cpRender(); }
+    function cpResetLayout() {
+      if (!confirm('Reset all cheque layout settings to defaults?')) return;
+      cpLayout = JSON.parse(JSON.stringify(CP_DEFAULTS));
+      cpSaveLayout(); cpBuildLayoutForm(); cpRender();
+    }
+
+    // ---------- Rendering (same markup for preview and print) ----------
+    function cpReadForm() {
+      return {
+        payee: document.getElementById('cpPayee').value.trim(),
+        amount: parseFloat(document.getElementById('cpAmount').value),
+        date: document.getElementById('cpDate').value,
+        words: document.getElementById('cpWords').value.trim(),
+        cross: document.getElementById('cpCross').checked
+      };
+    }
+
+    function cpFormatDate(iso, L) {
+      const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return '';
+      return L.dateStyle === 'slash' ? `${m[3]}/${m[2]}/${m[1]}` : m[3] + m[2] + m[1];
+    }
+
+    function cpSheetInner(d, L, opts) {
+      opts = opts || {};
+      const mm = n => `calc(var(--mm) * ${n})`;
+      const fsMM = L.fontPt * 0.3528;
+      const font = `font-size:${mm(fsMM.toFixed(3))};`;
+      let h = '';
+
+      if (opts.guides) {
+        const dateW = 8 * (fsMM * 0.56 + L.dateSpacing) + 2;
+        const g = (label, x, y, w, hh) =>
+          `<div class="cp-ghost" style="left:${mm(x)};top:${mm(y)};width:${mm(w)};height:${mm(hh)};">${label}</div>`;
+        h += g('Date', L.date.x, L.date.y, dateW.toFixed(1), (fsMM * 1.3).toFixed(1));
+        h += g('Pay', L.payee.x, L.payee.y, L.payee.w, (fsMM * 1.3).toFixed(1));
+        h += g('Rupees', L.words.x, L.words.y, L.words.w, (L.lineH * 2).toFixed(1));
+        h += g('Amount', L.amount.x, L.amount.y, 34, (fsMM * 1.6).toFixed(1));
+        h += g('', L.cross.x, L.cross.y, 34, 7);
+      }
+
+      const dateTxt = cpFormatDate(d.date, L);
+      if (dateTxt) {
+        h += `<div class="cp-el" style="left:${mm(L.date.x)};top:${mm(L.date.y)};${font}letter-spacing:${L.dateStyle === 'boxed' ? mm(L.dateSpacing) : '0'};font-weight:600;font-variant-numeric:tabular-nums;">${escapeHtml(dateTxt)}</div>`;
+      }
+      if (d.payee) {
+        h += `<div class="cp-el" style="left:${mm(L.payee.x)};top:${mm(L.payee.y)};width:${mm(L.payee.w)};${font}">${escapeHtml(d.payee)}</div>`;
+      }
+      if (d.words) {
+        let w = d.words;
+        if (L.upper) w = w.toUpperCase();
+        if (L.stars) w = '*** ' + w + ' ***';
+        h += `<div class="cp-el wrap" style="left:${mm(L.words.x)};top:${mm(L.words.y)};width:${mm(L.words.w)};${font}line-height:${mm(L.lineH)};">${escapeHtml(w)}</div>`;
+      }
+      if (isFinite(d.amount) && d.amount > 0) {
+        const fmt = d.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        h += `<div class="cp-el" style="left:${mm(L.amount.x)};top:${mm(L.amount.y)};${font}font-weight:700;">${escapeHtml(fmt)}</div>`;
+      }
+      if (d.cross) {
+        h += `<div class="cp-cross" style="left:${mm(L.cross.x)};top:${mm(L.cross.y)};width:${mm(34)};height:${mm(6)};font-size:${mm(2.9)};transform:rotate(-12deg);">A/C PAYEE ONLY</div>`;
+      }
+
+      return `<div class="cp-shift" style="left:${mm(L.offX)};top:${mm(L.offY)};width:${mm(L.w)};height:${mm(L.h)};">${h}</div>`;
+    }
+
+    function cpRender() {
+      const L = cpLayout;
+      const wrap = document.getElementById('cpPreviewWrap');
+      const sheet = document.getElementById('cpSheet');
+      if (!wrap || !sheet) return;
+      const avail = (wrap.clientWidth || 720) - 32;
+      const mmPx = Math.max(1.5, Math.min(6, avail / L.w));
+      sheet.style.setProperty('--mm', mmPx.toFixed(3) + 'px');
+      sheet.style.width = (L.w * mmPx) + 'px';
+      sheet.style.height = (L.h * mmPx) + 'px';
+      sheet.innerHTML = cpSheetInner(cpReadForm(), L, { guides: true });
+      document.getElementById('cpSizeLabel').textContent = `${L.w} × ${L.h} mm`;
+    }
+    window.addEventListener('resize', () => {
+      const v = document.getElementById('chequePrintView');
+      if (v && !v.classList.contains('hidden')) cpRender();
+    });
+
+    // ---------- Print ----------
+    function cpPrint(testMode) {
+      const L = cpLayout;
+      let d = cpReadForm();
+
+      if (testMode) {
+        d = { payee: 'SAMPLE SUPPLIER (PVT) LTD', amount: 123456.78, date: cpTodayISO(), words: cpAmountWords(123456.78), cross: true };
+      } else {
+        if (!d.payee) { showError('Enter the payee name before printing.'); return; }
+        if (!isFinite(d.amount) || d.amount <= 0) { showError('Enter a valid cheque amount before printing.'); return; }
+        if (!d.words) d.words = cpAmountWords(d.amount);
+      }
+
+      const pageW = L.paper === 'a4' ? 210 : L.w;
+      const pageH = L.paper === 'a4' ? 297 : L.h;
+      const border = testMode ? `.cp-page::after{content:'';position:absolute;left:${L.offX}mm;top:${L.offY}mm;width:${L.w}mm;height:${L.h}mm;border:0.3mm solid #999;box-sizing:border-box;}` : '';
+      const ghostCss = '.cp-ghost{position:absolute;border:0.2mm dashed #888;color:#888;font:6pt Arial,sans-serif;text-transform:uppercase;padding:0.3mm 0.8mm;overflow:hidden;}';
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cheque Print</title>
+        <style>
+          @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          html, body { margin: 0; padding: 0; background: #fff; }
+          :root { --mm: 1mm; }
+          .cp-page { position: relative; width: ${pageW}mm; height: ${pageH}mm; overflow: hidden; }
+          .cp-shift { position: absolute; }
+          .cp-el { position: absolute; white-space: nowrap; font-family: Arial, Helvetica, sans-serif; color: #000; line-height: 1; overflow: hidden; }
+          .cp-el.wrap { white-space: normal; overflow: visible; }
+          .cp-cross { position: absolute; border-top: 0.35mm solid #000; border-bottom: 0.35mm solid #000; text-align: center; font-family: Arial, Helvetica, sans-serif; font-weight: 700; color: #000; transform-origin: left top; display: flex; align-items: center; justify-content: center; }
+          ${ghostCss}
+          ${border}
+        </style></head>
+        <body><div class="cp-page">${cpSheetInner(d, L, { guides: testMode })}</div></body></html>`;
+
+      const old = document.getElementById('cpPrintFrame');
+      if (old) old.remove();
+      const frame = document.createElement('iframe');
+      frame.id = 'cpPrintFrame';
+      frame.setAttribute('aria-hidden', 'true');
+      frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+      frame.onload = () => {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch (e) {
+          showError('Could not open the print dialog. Please check your browser settings.');
+        }
+        setTimeout(() => { if (frame.parentNode) frame.remove(); }, 60000);
+      };
+      document.body.appendChild(frame);
+      frame.srcdoc = html;
     }
 
     // ---------- UTIL ----------
