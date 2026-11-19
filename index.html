@@ -848,6 +848,11 @@
         <div class="panel-header"><span class="panel-title">Cheque Details</span></div>
         <div class="panel-body">
           <div class="field">
+            <label for="cpBank">Bank (cheque layout)</label>
+            <select id="cpBank" class="input" onchange="cpSetBank(this.value)"></select>
+            <p class="cp-hint" id="cpBankNote" style="margin-top:0.35rem"></p>
+          </div>
+          <div class="field">
             <label for="cpPending">Quick fill from pending cheque (optional)</label>
             <select id="cpPending" class="input" onchange="cpFillFromPending(this.value)">
               <option value="">— Type details manually —</option>
@@ -2174,6 +2179,32 @@
 
     // ---------- CHEQUE PRINT TOOL ----------
     const CP_LAYOUT_KEY = 'sap_cheque_layout_v1';
+    const CP_BANK_KEY = 'sap_cheque_bank_v1';
+    const CP_BANKS = [
+      ['generic', 'Generic / Other bank'],
+      ['commercial', 'Commercial Bank'],
+      ['sampath', 'Sampath Bank'],
+      ['seylan', 'Seylan Bank'],
+      ['boc', 'Bank of Ceylon'],
+      ['peoples', "People's Bank"],
+      ['hnb', 'Hatton National Bank (HNB)'],
+      ['ndb', 'NDB Bank'],
+      ['ntb', 'Nations Trust Bank'],
+      ['dfcc', 'DFCC Bank'],
+      ['panasia', 'Pan Asia Bank'],
+      ['union', 'Union Bank'],
+      ['cargills', 'Cargills Bank'],
+      ['amana', 'Amana Bank'],
+      ['hsbc', 'HSBC'],
+      ['scb', 'Standard Chartered']
+    ];
+    function cpBankName(k) { const b = CP_BANKS.find(x => x[0] === k); return b ? b[1] : k; }
+    function cpStoredBank() {
+      let k = 'generic';
+      try { k = localStorage.getItem(CP_BANK_KEY) || 'generic'; } catch (e) {}
+      return CP_BANKS.some(x => x[0] === k) ? k : 'generic';
+    }
+    function cpLayoutStorageKey(bank) { return CP_LAYOUT_KEY + '_' + bank; }
     const CP_DEFAULTS = {
       w: 203, h: 89, paper: 'cheque',           // cheque size (mm) and paper: 'cheque' | 'a4'
       offX: 0, offY: 0,                          // global printer offset (mm)
@@ -2186,13 +2217,24 @@
       amount: { x: 166, y: 46 },
       cross:  { x: 12,  y: 12 }
     };
-    let cpLayout = cpLoadLayout();
+    let cpBank = cpStoredBank();
+    let cpLayout = cpLoadLayout(cpBank);
     let cpWordsManual = false;
     let cpBuilt = false;
 
-    function cpLoadLayout() {
+    function cpHasSavedLayout(bank) {
+      try {
+        return !!localStorage.getItem(cpLayoutStorageKey(bank)) ||
+               (bank === 'generic' && !!localStorage.getItem(CP_LAYOUT_KEY));
+      } catch (e) { return false; }
+    }
+    function cpLoadLayout(bank) {
       let saved = null;
-      try { saved = JSON.parse(localStorage.getItem(CP_LAYOUT_KEY) || 'null'); } catch (e) { saved = null; }
+      try {
+        let raw = localStorage.getItem(cpLayoutStorageKey(bank));
+        if (!raw && bank === 'generic') raw = localStorage.getItem(CP_LAYOUT_KEY); // earlier single-layout save
+        saved = JSON.parse(raw || 'null');
+      } catch (e) { saved = null; }
       const d = JSON.parse(JSON.stringify(CP_DEFAULTS));
       if (saved && typeof saved === 'object') {
         Object.keys(d).forEach(k => {
@@ -2206,7 +2248,8 @@
       return d;
     }
     function cpSaveLayout() {
-      try { localStorage.setItem(CP_LAYOUT_KEY, JSON.stringify(cpLayout)); } catch (e) {}
+      try { localStorage.setItem(cpLayoutStorageKey(cpBank), JSON.stringify(cpLayout)); } catch (e) {}
+      cpUpdateBankNote();
     }
 
     function switchView(view) {
@@ -2218,13 +2261,41 @@
       if (isCheque) cpOpen();
     }
 
+    function cpSetBank(bank) {
+      cpSaveLayout();                       // keep the bank we are leaving
+      cpBank = bank;
+      try { localStorage.setItem(CP_BANK_KEY, bank); } catch (e) {}
+      cpLayout = cpLoadLayout(bank);
+      cpBuildLayoutForm();
+      cpUpdateBankNote();
+      cpRender();
+    }
+    function cpUpdateBankNote() {
+      const el = document.getElementById('cpBankNote');
+      if (!el) return;
+      el.textContent = cpHasSavedLayout(cpBank)
+        ? `Using the saved margins for ${cpBankName(cpBank)}.`
+        : `Not calibrated yet for ${cpBankName(cpBank)} — run a Test Sheet and adjust the layout once; it will be remembered.`;
+    }
+    function cpCopyFromBank(from) {
+      if (!from) return;
+      if (!confirm(`Copy the layout from ${cpBankName(from)} into ${cpBankName(cpBank)}? This replaces the current ${cpBankName(cpBank)} settings.`)) return;
+      cpLayout = cpLoadLayout(from);
+      cpSaveLayout(); cpBuildLayoutForm(); cpRender();
+    }
+
     function cpTodayISO() {
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
     function cpOpen() {
-      if (!cpBuilt) { cpBuildLayoutForm(); cpBuilt = true; }
+      if (!cpBuilt) {
+        document.getElementById('cpBank').innerHTML = CP_BANKS.map(b => `<option value="${b[0]}">${escapeHtml(b[1])}</option>`).join('');
+        cpBuildLayoutForm(); cpBuilt = true;
+      }
+      document.getElementById('cpBank').value = cpBank;
+      cpUpdateBankNote();
       const dl = document.getElementById('cpSupplierDatalist');
       dl.innerHTML = (cachedSupplierList || []).map(s => `<option value="${escapeHtml(s.name)}"></option>`).join('');
 
@@ -2323,7 +2394,15 @@
         </div>`;
 
       document.getElementById('cpLayoutBody').innerHTML = `
-        <div class="cp-lay-head" style="margin-top:0">Cheque size &amp; printer offset</div>
+        <div class="cp-lay-head" style="margin-top:0">Editing: ${escapeHtml(cpBankName(cpBank))}</div>
+        <div class="cp-lay-row">
+          <span class="lbl">Copy from</span>
+          <select class="input" style="grid-column: span 3" onchange="cpCopyFromBank(this.value); this.value=''">
+            <option value="">— choose another bank to copy its margins —</option>
+            ${CP_BANKS.filter(b => b[0] !== cpBank).map(b => `<option value="${b[0]}">${escapeHtml(b[1])}${cpHasSavedLayout(b[0]) ? ' ✓' : ''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cp-lay-head">Cheque size &amp; printer offset</div>
         <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Width</span><span class="cp-lay-cap">Height</span><span></span></div>
         <div class="cp-lay-row"><span class="lbl">Cheque</span>${num('w', L.w)}${num('h', L.h)}<span></span></div>
         <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Shift →</span><span class="cp-lay-cap">Shift ↓</span><span></span></div>
@@ -2358,7 +2437,7 @@
         <label class="cp-check"><input type="checkbox" ${L.upper ? 'checked' : ''} onchange="cpSetOpt('upper', this.checked)"> Print amount in words in CAPITALS</label>
 
         <button type="button" class="btn btn-danger" style="margin-top:0.5rem" onclick="cpResetLayout()">Reset layout to defaults</button>
-        <p class="cp-hint">Settings are saved on this computer/browser, so each branch PC can keep its own printer calibration.</p>`;
+        <p class="cp-hint">Each bank keeps its own margins, saved on this computer/browser, so each branch PC can keep its own printer calibration.</p>`;
     }
 
     function cpSetNum(path, raw) {
@@ -2370,7 +2449,7 @@
     }
     function cpSetOpt(key, val) { cpLayout[key] = val; cpSaveLayout(); cpRender(); }
     function cpResetLayout() {
-      if (!confirm('Reset all cheque layout settings to defaults?')) return;
+      if (!confirm(`Reset the ${cpBankName(cpBank)} layout to defaults?`)) return;
       cpLayout = JSON.parse(JSON.stringify(CP_DEFAULTS));
       cpSaveLayout(); cpBuildLayoutForm(); cpRender();
     }
@@ -2445,7 +2524,7 @@
       sheet.style.width = (L.w * mmPx) + 'px';
       sheet.style.height = (L.h * mmPx) + 'px';
       sheet.innerHTML = cpSheetInner(cpReadForm(), L, { guides: true });
-      document.getElementById('cpSizeLabel').textContent = `${L.w} × ${L.h} mm`;
+      document.getElementById('cpSizeLabel').textContent = `${cpBankName(cpBank)} · ${L.w} × ${L.h} mm`;
     }
     window.addEventListener('resize', () => {
       const v = document.getElementById('chequePrintView');
