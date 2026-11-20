@@ -2204,47 +2204,66 @@
       try { k = localStorage.getItem(CP_BANK_KEY) || 'generic'; } catch (e) {}
       return CP_BANKS.some(x => x[0] === k) ? k : 'generic';
     }
-    function cpLayoutStorageKey(bank) { return CP_LAYOUT_KEY + '_' + bank; }
+    function cpLayoutStorageKey(bank) { return 'sap_cheque_layout_v2_' + bank; }
+    // Saves made before bank presets existed (ignored for Commercial, which now has a built-in layout)
+    function cpLegacyLayoutKey(bank) { return bank === 'commercial' ? null : CP_LAYOUT_KEY + '_' + bank; }
     const CP_DEFAULTS = {
       w: 203, h: 89, paper: 'cheque',           // cheque size (mm) and paper: 'cheque' | 'a4'
       offX: 0, offY: 0,                          // global printer offset (mm)
       fontPt: 11, lineH: 8, dateSpacing: 3.2,    // text sizing
-      dateStyle: 'boxed',                        // 'boxed' = DDMMYYYY with spacing, 'slash' = DD/MM/YYYY
+      datePitch: 6.15, wordsIndent: 0, crossAngle: -12,
+      dateStyle: 'boxed',                        // 'boxed' | 'slash' | 'cells' (8 date boxes) | 'cells20' (year starts with pre-printed 20)
       stars: true, upper: false,
       date:   { x: 152, y: 9 },
       payee:  { x: 28,  y: 27, w: 128 },
       words:  { x: 28,  y: 37, w: 128 },
       amount: { x: 166, y: 46 },
-      cross:  { x: 12,  y: 12 }
+      cross:  { x: 12,  y: 12, w: 34 }
+    };
+    // Built-in starting layouts (mm). Measured from a Commercial Bank of Ceylon cheque leaf: 178 x 90 mm, year "20" pre-printed.
+    const CP_PRESETS = {
+      commercial: {
+        w: 178, h: 90, offX: 0, offY: 0, fontPt: 11, lineH: 7.9,
+        dateStyle: 'cells20', datePitch: 6.15, wordsIndent: 10.6, stars: true, crossAngle: -40,
+        date:   { x: 122.4, y: 6.7 },
+        payee:  { x: 18,    y: 22.4, w: 150 },
+        words:  { x: 13.2,  y: 30.9, w: 99 },
+        amount: { x: 124,   y: 37.6 },
+        cross:  { x: 1.5,   y: 18,   w: 26 }
+      }
     };
     let cpBank = cpStoredBank();
     let cpLayout = cpLoadLayout(cpBank);
     let cpWordsManual = false;
     let cpBuilt = false;
 
-    function cpHasSavedLayout(bank) {
+    function cpRawSaved(bank) {
       try {
-        return !!localStorage.getItem(cpLayoutStorageKey(bank)) ||
-               (bank === 'generic' && !!localStorage.getItem(CP_LAYOUT_KEY));
-      } catch (e) { return false; }
+        let raw = localStorage.getItem(cpLayoutStorageKey(bank));
+        const legacy = cpLegacyLayoutKey(bank);
+        if (!raw && legacy) raw = localStorage.getItem(legacy);
+        if (!raw && bank === 'generic') raw = localStorage.getItem(CP_LAYOUT_KEY); // earliest single-layout save
+        return raw;
+      } catch (e) { return null; }
+    }
+    function cpHasSavedLayout(bank) { return !!cpRawSaved(bank); }
+    function cpMerge(d, src) {
+      if (!src || typeof src !== 'object') return d;
+      Object.keys(d).forEach(k => {
+        if (d[k] && typeof d[k] === 'object') {
+          if (src[k] && typeof src[k] === 'object') Object.assign(d[k], src[k]);
+        } else if (src[k] !== undefined) {
+          d[k] = src[k];
+        }
+      });
+      return d;
     }
     function cpLoadLayout(bank) {
       let saved = null;
-      try {
-        let raw = localStorage.getItem(cpLayoutStorageKey(bank));
-        if (!raw && bank === 'generic') raw = localStorage.getItem(CP_LAYOUT_KEY); // earlier single-layout save
-        saved = JSON.parse(raw || 'null');
-      } catch (e) { saved = null; }
+      try { saved = JSON.parse(cpRawSaved(bank) || 'null'); } catch (e) { saved = null; }
       const d = JSON.parse(JSON.stringify(CP_DEFAULTS));
-      if (saved && typeof saved === 'object') {
-        Object.keys(d).forEach(k => {
-          if (d[k] && typeof d[k] === 'object') {
-            if (saved[k] && typeof saved[k] === 'object') Object.assign(d[k], saved[k]);
-          } else if (saved[k] !== undefined) {
-            d[k] = saved[k];
-          }
-        });
-      }
+      cpMerge(d, CP_PRESETS[bank]);   // built-in layout for the bank (if any)
+      cpMerge(d, saved);              // then this PC's own fine-tuning
       return d;
     }
     function cpSaveLayout() {
@@ -2262,7 +2281,6 @@
     }
 
     function cpSetBank(bank) {
-      cpSaveLayout();                       // keep the bank we are leaving
       cpBank = bank;
       try { localStorage.setItem(CP_BANK_KEY, bank); } catch (e) {}
       cpLayout = cpLoadLayout(bank);
@@ -2273,9 +2291,10 @@
     function cpUpdateBankNote() {
       const el = document.getElementById('cpBankNote');
       if (!el) return;
-      el.textContent = cpHasSavedLayout(cpBank)
-        ? `Using the saved margins for ${cpBankName(cpBank)}.`
-        : `Not calibrated yet for ${cpBankName(cpBank)} — run a Test Sheet and adjust the layout once; it will be remembered.`;
+      const name = cpBankName(cpBank);
+      if (cpHasSavedLayout(cpBank)) el.textContent = `Using your saved margins for ${name}.`;
+      else if (CP_PRESETS[cpBank]) el.textContent = `Built-in ${name} layout loaded (${CP_PRESETS[cpBank].w} × ${CP_PRESETS[cpBank].h} mm). Run a Test Sheet and fine-tune once for your printer — it will be remembered.`;
+      else el.textContent = `Not calibrated yet for ${name} — run a Test Sheet and adjust the layout once; it will be remembered.`;
     }
     function cpCopyFromBank(from) {
       if (!from) return;
@@ -2421,15 +2440,19 @@
         ${posRow('payee', 'Payee', true)}
         ${posRow('words', 'Amount words', true)}
         ${posRow('amount', 'Amount (figures)')}
-        ${posRow('cross', 'A/C Payee crossing')}
+        ${posRow('cross', 'A/C Payee crossing', true)}
 
         <div class="cp-lay-head">Text style</div>
         <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Font (pt)</span><span class="cp-lay-cap">Words line gap</span><span class="cp-lay-cap">Date spacing</span></div>
         <div class="cp-lay-row"><span class="lbl">Sizes</span>${num('fontPt', L.fontPt, 0.5)}${num('lineH', L.lineH, 0.5)}${num('dateSpacing', L.dateSpacing, 0.1)}</div>
+        <div class="cp-lay-row"><span></span><span class="cp-lay-cap">Date box width</span><span class="cp-lay-cap">Words 1st-line indent</span><span class="cp-lay-cap">Crossing angle°</span></div>
+        <div class="cp-lay-row"><span class="lbl">Boxes / angle</span>${num('datePitch', L.datePitch, 0.05)}${num('wordsIndent', L.wordsIndent, 0.5)}${num('crossAngle', L.crossAngle, 1)}</div>
         <div class="cp-lay-row">
           <span class="lbl">Date format</span>
           <select class="input" style="grid-column: span 3" onchange="cpSetOpt('dateStyle', this.value)">
-            <option value="boxed" ${L.dateStyle === 'boxed' ? 'selected' : ''}>DDMMYYYY — spaced to fit date boxes</option>
+            <option value="cells20" ${L.dateStyle === 'cells20' ? 'selected' : ''}>Date boxes — year “20” pre-printed (prints DD MM __ __ YY)</option>
+            <option value="cells" ${L.dateStyle === 'cells' ? 'selected' : ''}>Date boxes — all 8 boxes (DDMMYYYY)</option>
+            <option value="boxed" ${L.dateStyle === 'boxed' ? 'selected' : ''}>DDMMYYYY — letter-spaced text</option>
             <option value="slash" ${L.dateStyle === 'slash' ? 'selected' : ''}>DD/MM/YYYY</option>
           </select>
         </div>
@@ -2449,9 +2472,14 @@
     }
     function cpSetOpt(key, val) { cpLayout[key] = val; cpSaveLayout(); cpRender(); }
     function cpResetLayout() {
-      if (!confirm(`Reset the ${cpBankName(cpBank)} layout to defaults?`)) return;
-      cpLayout = JSON.parse(JSON.stringify(CP_DEFAULTS));
-      cpSaveLayout(); cpBuildLayoutForm(); cpRender();
+      if (!confirm(`Reset the ${cpBankName(cpBank)} layout to its defaults?`)) return;
+      try {
+        localStorage.removeItem(cpLayoutStorageKey(cpBank));
+        const lg = cpLegacyLayoutKey(cpBank); if (lg) localStorage.removeItem(lg);
+        if (cpBank === 'generic') localStorage.removeItem(CP_LAYOUT_KEY);
+      } catch (e) {}
+      cpLayout = cpLoadLayout(cpBank);
+      cpBuildLayoutForm(); cpUpdateBankNote(); cpRender();
     }
 
     // ---------- Rendering (same markup for preview and print) ----------
@@ -2463,6 +2491,17 @@
         words: document.getElementById('cpWords').value.trim(),
         cross: document.getElementById('cpCross').checked
       };
+    }
+
+    function cpDateCells(iso, L) {
+      const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return [];
+      const out = [];
+      const put = (str, startSlot) => str.split('').forEach((ch, i) => out.push({ slot: startSlot + i, ch }));
+      put(m[3] + m[2], 0);                                   // DD MM
+      if (L.dateStyle === 'cells20') put(m[1].slice(2), 6);  // YY into the last two boxes
+      else put(m[1], 4);                                     // YYYY
+      return out;
     }
 
     function cpFormatDate(iso, L) {
@@ -2479,19 +2518,27 @@
       let h = '';
 
       if (opts.guides) {
-        const dateW = 8 * (fsMM * 0.56 + L.dateSpacing) + 2;
+        const isCells = (L.dateStyle === 'cells' || L.dateStyle === 'cells20');
+        const dateW = isCells ? 8 * L.datePitch : 8 * (fsMM * 0.56 + L.dateSpacing) + 2;
         const g = (label, x, y, w, hh) =>
           `<div class="cp-ghost" style="left:${mm(x)};top:${mm(y)};width:${mm(w)};height:${mm(hh)};">${label}</div>`;
         h += g('Date', L.date.x, L.date.y, dateW.toFixed(1), (fsMM * 1.3).toFixed(1));
         h += g('Pay', L.payee.x, L.payee.y, L.payee.w, (fsMM * 1.3).toFixed(1));
         h += g('Rupees', L.words.x, L.words.y, L.words.w, (L.lineH * 2).toFixed(1));
         h += g('Amount', L.amount.x, L.amount.y, 34, (fsMM * 1.6).toFixed(1));
-        h += g('', L.cross.x, L.cross.y, 34, 7);
+        h += `<div class="cp-ghost" style="left:${mm(L.cross.x)};top:${mm(L.cross.y)};width:${mm(L.cross.w || 34)};height:${mm(6)};transform:rotate(${Number.isFinite(L.crossAngle) ? L.crossAngle : -12}deg);transform-origin:left top;"></div>`;
       }
 
-      const dateTxt = cpFormatDate(d.date, L);
-      if (dateTxt) {
-        h += `<div class="cp-el" style="left:${mm(L.date.x)};top:${mm(L.date.y)};${font}letter-spacing:${L.dateStyle === 'boxed' ? mm(L.dateSpacing) : '0'};font-weight:600;font-variant-numeric:tabular-nums;">${escapeHtml(dateTxt)}</div>`;
+      if (L.dateStyle === 'cells' || L.dateStyle === 'cells20') {
+        // one digit per printed date box: D D M M Y Y Y Y  (cells20 skips the two pre-printed "20" boxes)
+        cpDateCells(d.date, L).forEach(c => {
+          h += `<div class="cp-el" style="left:${mm(L.date.x + c.slot * L.datePitch)};top:${mm(L.date.y)};width:${mm(L.datePitch)};text-align:center;${font}font-weight:600;">${c.ch}</div>`;
+        });
+      } else {
+        const dateTxt = cpFormatDate(d.date, L);
+        if (dateTxt) {
+          h += `<div class="cp-el" style="left:${mm(L.date.x)};top:${mm(L.date.y)};${font}letter-spacing:${L.dateStyle === 'boxed' ? mm(L.dateSpacing) : '0'};font-weight:600;font-variant-numeric:tabular-nums;">${escapeHtml(dateTxt)}</div>`;
+        }
       }
       if (d.payee) {
         h += `<div class="cp-el" style="left:${mm(L.payee.x)};top:${mm(L.payee.y)};width:${mm(L.payee.w)};${font}">${escapeHtml(d.payee)}</div>`;
@@ -2500,17 +2547,51 @@
         let w = d.words;
         if (L.upper) w = w.toUpperCase();
         if (L.stars) w = '*** ' + w + ' ***';
-        h += `<div class="cp-el wrap" style="left:${mm(L.words.x)};top:${mm(L.words.y)};width:${mm(L.words.w)};${font}line-height:${mm(L.lineH)};">${escapeHtml(w)}</div>`;
+        h += `<div class="cp-el wrap" style="left:${mm(L.words.x)};top:${mm(L.words.y)};width:${mm(L.words.w)};${font}line-height:${mm(L.lineH)};text-indent:${mm(L.wordsIndent || 0)};">${escapeHtml(w)}</div>`;
       }
       if (isFinite(d.amount) && d.amount > 0) {
         const fmt = d.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         h += `<div class="cp-el" style="left:${mm(L.amount.x)};top:${mm(L.amount.y)};${font}font-weight:700;">${escapeHtml(fmt)}</div>`;
       }
       if (d.cross) {
-        h += `<div class="cp-cross" style="left:${mm(L.cross.x)};top:${mm(L.cross.y)};width:${mm(34)};height:${mm(6)};font-size:${mm(2.9)};transform:rotate(-12deg);">A/C PAYEE ONLY</div>`;
+        h += `<div class="cp-cross" style="left:${mm(L.cross.x)};top:${mm(L.cross.y)};width:${mm(L.cross.w || 34)};height:${mm(6)};font-size:${mm(2.9)};transform:rotate(${Number.isFinite(L.crossAngle) ? L.crossAngle : -12}deg);">A/C PAYEE ONLY</div>`;
       }
 
       return `<div class="cp-shift" style="left:${mm(L.offX)};top:${mm(L.offY)};width:${mm(L.w)};height:${mm(L.h)};">${h}</div>`;
+    }
+
+    // Faint drawing of the real cheque leaf (preview only, never printed) so you can see how the text lines up
+    function cpTemplateHTML(bank) {
+      if (bank !== 'commercial') return '';
+      const m = n => `calc(var(--mm) * ${n})`;
+      const ink = '#7f8f95';
+      const box = (x, y, w, h, css) => `<div style="position:absolute;left:${m(x)};top:${m(y)};width:${m(w)};height:${m(h)};${css || ''}"></div>`;
+      const line = (x, y, w) => box(x, y, w, 0, `border-top:${m(0.25)} solid ${ink};`);
+      const txt = (t, x, y, size, css) => `<div style="position:absolute;left:${m(x)};top:${m(y)};font:${'400'} ${m(size)} Arial,sans-serif;line-height:1;white-space:nowrap;color:${ink};${css || ''}">${t}</div>`;
+      let h = '';
+      h += box(3.3, 18.4, 174.7, 56.7, 'background:#D9EEF1;');
+      h += box(8.6, 2.1, 40, 9.8, 'background:#3A73B8;border-radius:' + m(0.8) + ';');
+      h += txt('COMMERCIAL BANK', 14, 5.8, 3, 'color:#fff;font-weight:700;');
+      h += txt('COMMERCIAL BANK OF CEYLON PLC', 50, 3, 3.5, 'font-weight:600;');
+      h += txt('YAKKALA', 16.2, 14.6, 2.3);
+      const x0 = 122.4, pitch = 6.15, labels = ['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y'];
+      for (let i = 0; i < 8; i++) {
+        h += box(x0 + i * pitch, 4.96, pitch, 7.84, `border:${m(0.25)} solid ${ink};box-sizing:border-box;`);
+        h += txt(labels[i], x0 + i * pitch + pitch / 2 - 0.8, 14, 2.2);
+      }
+      h += txt('2', x0 + 4 * pitch + pitch / 2 - 1, 6.9, 4.4, 'font-weight:600;');
+      h += txt('0', x0 + 5 * pitch + pitch / 2 - 1, 6.9, 4.4, 'font-weight:600;');
+      h += txt('Pay', 11.6, 23.4, 3.4);
+      h += line(16.9, 26.4, 154.7);
+      h += txt('Rupees', 12.5, 35.3, 3.4);
+      h += line(23.8, 36.9, 89.5);
+      h += line(13.2, 44.8, 100.1);
+      h += line(13.2, 52.8, 100.1);
+      h += box(121.6, 32.9, 50.3, 13.4, `border:${m(0.3)} solid ${ink};box-sizing:border-box;`);
+      h += txt('Rs.', 114.1, 36.8, 3.4);
+      h += txt('SAP COMPUTERS', 17.8, 61.9, 3.4);
+      h += txt('1850016846', 17.8, 66.2, 3.4);
+      return h;
     }
 
     function cpRender() {
@@ -2523,7 +2604,7 @@
       sheet.style.setProperty('--mm', mmPx.toFixed(3) + 'px');
       sheet.style.width = (L.w * mmPx) + 'px';
       sheet.style.height = (L.h * mmPx) + 'px';
-      sheet.innerHTML = cpSheetInner(cpReadForm(), L, { guides: true });
+      sheet.innerHTML = cpTemplateHTML(cpBank) + cpSheetInner(cpReadForm(), L, { guides: true });
       document.getElementById('cpSizeLabel').textContent = `${cpBankName(cpBank)} · ${L.w} × ${L.h} mm`;
     }
     window.addEventListener('resize', () => {
